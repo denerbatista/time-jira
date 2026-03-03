@@ -1,196 +1,1162 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Time Tracker</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    :root{--bg:#131722;--card:#1b2130;--muted:#9ca8c0;--text:#edf1ff;--primary:#4c8dff;--line:#2a3348;--ok:#3ac58f;--warn:#ffb34d;--danger:#ff6b6b}
-    *{box-sizing:border-box} html,body{height:100%;overflow:hidden} body{margin:0;font-family:Inter,system-ui;background:var(--bg);color:var(--text)}
-    .app{height:100vh;display:flex;overflow:hidden}
-    .sidebar{width:250px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;transition:.2s}
-    .sidebar.compact{width:74px}.sidebar.hidden{width:0;border-right:0;overflow:hidden}
-    .brand{padding:14px;display:flex;align-items:center;gap:10px;font-weight:700}.brand i{color:var(--primary)} .brand span{white-space:nowrap}
-    .sidebar.compact .brand span,.sidebar.compact .nav span{display:none}
-    .nav{padding:8px;display:flex;flex-direction:column;gap:6px}.nav button{height:38px;border:0;background:transparent;color:var(--muted);border-radius:10px;display:flex;align-items:center;gap:10px;padding:0 10px;cursor:pointer}.nav button.active,.nav button:hover{background:#232c40;color:var(--text)}
-    .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-    .header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line);background:var(--card)}
-    .header .left,.header .right{display:flex;align-items:center;gap:8px}
-    .icon{width:34px;height:34px;border:1px solid var(--line);background:#212a3d;border-radius:10px;color:var(--text);display:grid;place-items:center;cursor:pointer}
-    .select,.input{height:34px;border-radius:10px;border:1px solid var(--line);background:#212a3d;color:var(--text);padding:0 10px}
-    .content{flex:1;padding:10px;overflow:hidden}
-    .dashboard{height:100%;display:grid;grid-template-rows:auto auto 1fr;gap:10px}
-    .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;min-height:0}
-    .card.pad{padding:10px}.kpi .v{font-size:24px;font-weight:700}.muted{color:var(--muted);font-size:12px}
-    .charts{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;min-height:0}
-    .bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0}
-    .scroller{overflow:auto}
-    .scroller::-webkit-scrollbar{width:8px;height:8px}.scroller::-webkit-scrollbar-thumb{background:#405172;border-radius:8px}.scroller::-webkit-scrollbar-track{background:#1b2233}
-    .project-list,.day-list{display:flex;flex-direction:column;gap:8px;padding:8px}
-    .project-item{display:flex;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px}
-    .badge{font-size:11px;padding:2px 7px;border-radius:999px;background:#26314b;color:#aecdff}
-    .reports{display:none;height:100%}.reports.active{display:block}
-    .dashboard.hidden{display:none}
-    details{border:1px solid var(--line);border-radius:10px;padding:8px;background:#1a2234} details summary{cursor:pointer}
-    .entry{margin-top:6px;border-top:1px dashed var(--line);padding-top:6px;font-size:12px;display:flex;justify-content:space-between;gap:8px}
-    .auth{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center}.auth.show{display:grid}
-    .authBox{width:420px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
-    .accounts{max-height:130px;overflow:auto;display:flex;flex-direction:column;gap:6px}
-    .acc{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line);padding:6px;border-radius:9px}
-  </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Time Tracker - Acompanhamento de Horas</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root{
+            /* similar to app/globals.css from the zip */
+            --background: oklch(0.13 0.005 260);
+            --foreground: oklch(0.95 0 0);
+            --card: oklch(0.17 0.005 260);
+            --popover: oklch(0.17 0.005 260);
+            --primary: oklch(0.65 0.18 230);
+            --primary-foreground: oklch(0.98 0 0);
+            --secondary: oklch(0.22 0.005 260);
+            --muted-foreground: oklch(0.65 0 0);
+            --border: oklch(0.26 0.005 260);
+            --success: oklch(0.72 0.17 165);
+            --warning: oklch(0.75 0.18 80);
+            --chart-2: oklch(0.72 0.17 165);
+            --chart-3: oklch(0.75 0.18 80);
+            --chart-4: oklch(0.60 0.20 300);
+            --chart-5: oklch(0.65 0.22 25);
+            --destructive: oklch(0.55 0.22 27);
+            --radius: 12px;
+        }
+
+        *{box-sizing:border-box}
+        html,body{height:100%}
+        body{
+            margin:0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+        }
+        .mono{font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+
+        .app{display:flex;height:100vh;overflow:hidden}
+        .sidebar{
+            width:256px;background:var(--card);border-right:1px solid var(--border);
+            padding:24px 12px;display:none;flex-direction:column;gap:4px;
+        }
+        @media(min-width:1024px){.sidebar{display:flex}}
+        .brand{display:flex;gap:12px;align-items:center;padding:0 12px;margin-bottom:28px}
+        .brandIcon{
+            width:36px;height:36px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);
+            display:flex;align-items:center;justify-content:center;
+        }
+        .brandTitle{font-size:14px;font-weight:700;line-height:1.1}
+        .brandSub{font-size:12px;color:var(--muted-foreground);margin-top:2px}
+
+        .nav{display:flex;flex-direction:column;gap:4px}
+        .navBtn{
+            border:0;background:transparent;color:var(--muted-foreground);
+            padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:10px;
+            font-weight:600;cursor:pointer;transition:.15s;text-align:left;
+        }
+        .navBtn:hover{background:var(--secondary);color:var(--foreground)}
+        .navBtn.active{background:color-mix(in oklch, var(--primary), transparent 85%);color:var(--primary)}
+        .sidebarFooter{margin-top:auto;padding:0 12px}
+        .sprintCard{background:var(--secondary);border-radius:12px;padding:14px}
+        .sprintCard .k{font-size:12px;font-weight:700}
+        .sprintCard .v{font-size:18px;font-weight:800;color:var(--primary);margin-top:2px}
+        .sprintCard .d{font-size:12px;color:var(--muted-foreground);margin-top:6px}
+
+        .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+        .header{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border);
+        }
+        @media(min-width:1024px){.header{padding:12px 24px}}
+        .hLeft{display:flex;align-items:center;gap:12px}
+        .iconBtn{
+            width:36px;height:36px;border-radius:12px;border:0;background:transparent;color:var(--muted-foreground);
+            display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative;
+        }
+        .iconBtn:hover{background:var(--secondary);color:var(--foreground)}
+        #btnMenu{display:flex}
+        @media(min-width:1024px){#btnMenu{display:none}}
+
+        .select{
+            height:32px;border-radius:10px;padding:0 10px;border:1px solid var(--border);
+            background:var(--secondary);color:var(--foreground);font-size:12px;outline:none;
+        }
+        .hSelects{display:none;align-items:center;gap:10px}
+        @media(min-width:640px){.hSelects{display:flex}}
+        .hRight{display:flex;align-items:center;gap:6px}
+        .notifDot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:999px;background:var(--primary)}
+        .avatar{
+            width:32px;height:32px;border-radius:999px;background:color-mix(in oklch, var(--primary), transparent 88%);
+            color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-left:6px;
+        }
+
+        .content{flex:1;overflow:auto;padding:16px}
+        @media(min-width:1024px){.content{padding:24px}}
+        .titleBlock{margin-bottom:24px}
+        .titleBlock h2{margin:0;font-size:20px;font-weight:700}
+        .titleBlock p{margin:6px 0 0 0;font-size:13px;color:var(--muted-foreground)}
+
+        .gridStats{display:grid;grid-template-columns:1fr;gap:16px}
+        @media(min-width:640px){.gridStats{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1280px){.gridStats{grid-template-columns:repeat(4,1fr)}}
+
+        .grid2{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:1280px){.grid2{grid-template-columns:repeat(2,1fr)}}
+
+        .grid3{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:1280px){.grid3{grid-template-columns:2fr 1fr}}
+
+        .grid4{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:768px){.grid4{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1280px){.grid4{grid-template-columns:repeat(4,1fr)}}
+
+        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+        .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between}
+        .cardTitle{font-size:13px;font-weight:650}
+        .cardBody{padding:0 18px 18px 18px}
+
+        .statLabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600}
+        .statIcon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+        .statValue{font-size:26px;font-weight:800}
+        .statDetail{font-size:12px;color:var(--muted-foreground);margin-top:2px}
+        .statTrend{font-size:12px;font-weight:650;margin-top:10px}
+        .trendUp{color:var(--success)}
+        .trendDown{color:var(--warning)}
+
+        .legend{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted-foreground)}
+        .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px;vertical-align:middle}
+        .dot.primary{background:var(--primary)}
+        .dot.muted{background:color-mix(in oklch, var(--muted-foreground), transparent 70%)}
+        .dot.c2{background:var(--chart-2)}
+        .chartWrap{height:260px;}
+
+        .err{
+            display:none;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid color-mix(in oklch, var(--destructive), transparent 60%);
+            background:color-mix(in oklch, var(--destructive), transparent 85%);
+            color:color-mix(in oklch, var(--foreground), transparent 10%);
+            white-space:pre-wrap;
+            font-size:12px;
+            margin-bottom: 16px;
+        }
+
+        /* Cards list */
+        .list{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding-right:4px}
+        .jiraCard{
+            border:1px solid var(--border);
+            background:color-mix(in oklch, var(--secondary), transparent 70%);
+            border-radius:14px;padding:14px;transition:.15s;
+        }
+        .jiraCard:hover{background:color-mix(in oklch, var(--secondary), transparent 45%)}
+        .row{display:flex;gap:12px;align-items:flex-start}
+        .grow{flex:1;min-width:0}
+        .badge{
+            display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;
+            font-size:10px;border:1px solid var(--border);color:var(--muted-foreground);background:transparent;white-space:nowrap;
+        }
+        .badge.primary{border-color:color-mix(in oklch,var(--primary),transparent 75%);background:color-mix(in oklch,var(--primary),transparent 88%);color:var(--primary)}
+        .badge.success{border-color:color-mix(in oklch,var(--success),transparent 75%);background:color-mix(in oklch,var(--success),transparent 88%);color:var(--success)}
+        .badge.warning{border-color:color-mix(in oklch,var(--warning),transparent 75%);background:color-mix(in oklch,var(--warning),transparent 88%);color:var(--warning)}
+        .badge.chart5{border-color:color-mix(in oklch,var(--chart-5),transparent 75%);background:color-mix(in oklch,var(--chart-5),transparent 88%);color:var(--chart-5)}
+        .key{font-size:12px;color:var(--primary);font-weight:650}
+        .title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .progress{height:6px;border-radius:999px;background:var(--secondary);overflow:hidden}
+        .progress>div{height:100%;background:var(--primary);border-radius:999px}
+        .progress.over>div{background:var(--chart-5)}
+
+        .subline{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted-foreground)}
+
+        /* Sprint progress */
+        .sprintWrap{display:flex;gap:16px;align-items:center}
+        .ring{width:96px;height:96px;position:relative;flex:0 0 auto}
+        .ring svg{width:96px;height:96px;transform: rotate(-90deg)}
+        .ringCenter{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800}
+        .sprintLines{flex:1;display:flex;flex-direction:column;gap:8px}
+        .lineItem{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+        .lineLeft{display:flex;align-items:center;gap:8px;color:var(--muted-foreground)}
+        .miniDot{width:10px;height:10px;border-radius:999px}
+        .miniDot.est{background:color-mix(in oklch,var(--muted-foreground),transparent 70%)}
+        .miniDot.log{background:var(--primary)}
+        .miniDot.ot{background:var(--chart-5)}
+        .lineVal{font-weight:750}
+
+        .sectionLabel{margin-top:16px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700}
+        .barRow{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+        .barItem .top{display:flex;justify-content:space-between;font-size:12px}
+        .barItem .bar{height:6px;background:var(--secondary);border-radius:999px;overflow:hidden;margin-top:6px}
+        .barItem .bar>div{height:100%;background:color-mix(in oklch,var(--primary),transparent 35%);border-radius:999px}
+
+        /* Project distribution */
+        .projWrap{display:flex;gap:16px;align-items:center}
+        .donut{width:180px;height:180px;flex:0 0 auto}
+        .projList{flex:1;display:flex;flex-direction:column;gap:12px}
+        .projItem{display:flex;gap:10px;align-items:center}
+        .projNameRow{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+        .projBar{height:6px;background:var(--secondary);border-radius:999px;overflow:hidden;margin-top:6px}
+        .projBar>div{height:100%;border-radius:999px}
+
+        /* Heatmap */
+        .heatTable{width:100%;border-collapse:collapse}
+        .heatTable th,.heatTable td{padding:6px 6px;font-size:12px}
+        .heatTable th{color:var(--muted-foreground);font-weight:500}
+        .heatCell{
+            min-width:36px;aspect-ratio:1/1;border-radius:10px;display:flex;align-items:center;justify-content:center;
+            background:var(--secondary);border:1px solid color-mix(in oklch,var(--border),transparent 25%);
+            color:color-mix(in oklch,var(--foreground),transparent 25%);
+        }
+
+        /* Recent activity */
+        .activity{display:flex;flex-direction:column;gap:14px}
+        .actRow{display:flex;gap:12px;align-items:flex-start}
+        .actLine{display:flex;flex-direction:column;align-items:center}
+        .actDot{width:10px;height:10px;border-radius:999px;margin-top:6px}
+        .actStick{width:1px;flex:1;background:var(--border);margin-top:6px}
+        .actBody{flex:1;min-width:0;padding-bottom:14px}
+        .actTitle{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .actMeta{margin-top:6px;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted-foreground)}
+        .actMeta .right{margin-left:auto}
+
+        /* Overlay drawer */
+        .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:stretch;justify-content:flex-end;z-index:50}
+        .drawer{width:min(420px,92vw);background:var(--card);border-left:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:12px}
+        .drawerHeader{display:flex;align-items:center;justify-content:space-between}
+        .drawerTitle{font-weight:800}
+        .drawerClose{border:0;background:transparent;color:var(--muted-foreground);cursor:pointer}
+        .drawerClose:hover{color:var(--foreground)}
+        .field{display:flex;flex-direction:column;gap:6px}
+        .field label{font-size:12px;color:var(--muted-foreground)}
+        .input,.select2{height:40px;border-radius:12px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);padding:0 12px;outline:none;font-size:13px}
+        .help{font-size:12px;color:var(--muted-foreground);line-height:1.35}
+        .btnRow{display:flex;gap:10px;margin-top:8px}
+        .btn{height:40px;border-radius:12px;padding:0 12px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);cursor:pointer;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px}
+        .btn.primary{background:var(--primary);border-color:transparent;color:var(--primary-foreground)}
+        .btn:disabled{opacity:.65;cursor:not-allowed}
+
+        /* Mobile sidebar sheet */
+        .sideOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:60;align-items:stretch;justify-content:flex-start}
+        .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
+
+        code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
+    </style>
 </head>
 <body>
 <div class="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand"><i data-lucide="clock-3"></i><span>Time Tracker</span></div>
-    <div class="nav">
-      <button class="active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visão geral</span></button>
-      <button data-view="reports"><i data-lucide="file-text"></i><span>Relatórios</span></button>
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brandIcon"><i data-lucide="clock"></i></div>
+            <div>
+                <div class="brandTitle">Time Tracker</div>
+                <div class="brandSub">Jira Integration</div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
+            <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
+            <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+                    </nav>
+
+        <div class="sidebarFooter">
+            <div class="sprintCard">
+                <div class="k">Progresso do Mes</div>
+                <div class="v mono" id="sprintLabel">Mes atual</div>
+                <div class="d" id="sprintHint">Período selecionado</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="sideOverlay" id="sideOverlay" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="sideSheet">
+            <div class="brand" style="padding:0 12px;margin-bottom:18px;">
+                <div class="brandIcon"><i data-lucide="clock"></i></div>
+                <div>
+                    <div class="brandTitle">Time Tracker</div>
+                    <div class="brandSub">Jira Integration</div>
+                </div>
+            </div>
+            <nav class="nav">
+                <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
+                <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
+                <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+            </nav>
+            <div class="sidebarFooter">
+                <div class="sprintCard">
+                    <div class="k">Progresso do Mes</div>
+                    <div class="v mono">Sprint 14</div>
+                    <div class="d">Período selecionado</div>
+                </div>
+            </div>
+        </div>
+        <div style="flex:1" onclick="closeSidebar()"></div>
     </div>
-  </aside>
-  <section class="main">
-    <header class="header">
-      <div class="left">
-        <button class="icon" id="toggleSide"><i data-lucide="panel-left"></i></button>
-        <button class="icon" id="hideSide"><i data-lucide="panel-left-close"></i></button>
-        <button class="icon" id="prevMonth"><i data-lucide="chevron-left"></i></button>
-        <div id="monthLabel"></div>
-        <button class="icon" id="nextMonth"><i data-lucide="chevron-right"></i></button>
-        <select class="select" id="project"></select>
-      </div>
-      <div class="right">
-        <button class="icon" id="openAuth"><i data-lucide="user-cog"></i></button>
-        <button class="icon" id="logout"><i data-lucide="log-out"></i></button>
-      </div>
-    </header>
-    <main class="content">
-      <div class="dashboard" id="dashboard">
-        <div class="kpis">
-          <div class="card pad kpi"><div class="muted">Horas do mês</div><div class="v" id="kTotal">00:00</div></div>
-          <div class="card pad kpi"><div class="muted">Cartões com horas</div><div class="v" id="kCards">0</div></div>
-          <div class="card pad kpi"><div class="muted">Média diária</div><div class="v" id="kAvg">00:00</div></div>
-          <div class="card pad kpi"><div class="muted">Progresso do mês</div><div class="v" id="kPct">0%</div></div>
-        </div>
-        <div class="charts">
-          <div class="card pad"><div>Horas por dia</div><canvas id="cDaily"></canvas></div>
-          <div class="card pad"><div>Cartões revisados</div><canvas id="cReview"></canvas></div>
-          <div class="card scroller"><div class="project-list" id="projectDist"></div></div>
-        </div>
-        <div class="bottom">
-          <div class="card pad"><div>Progresso do mês</div><div class="muted" id="progressText"></div></div>
-          <div class="card pad"><div>Últimas atividades</div><div class="scroller day-list" id="activity" style="max-height:100%"></div></div>
-        </div>
-      </div>
-      <div class="reports" id="reports"><div class="card scroller" style="height:100%"><div class="day-list" id="dailyDetails"></div></div></div>
-    </main>
-  </section>
+
+    <div class="main">
+        <header class="header">
+            <div class="hLeft">
+                <button class="iconBtn" id="btnMenu" title="Menu"><i data-lucide="menu"></i></button>
+                <div class="hSelects">
+                    <button class="iconBtn" id="btnPrevMonth" title="Mes anterior"><i data-lucide="chevron-left"></i></button>
+                    <div class="select" id="monthLabel" style="display:flex;align-items:center;min-width:140px;justify-content:center"></div>
+                    <button class="iconBtn" id="btnNextMonth" title="Proximo mes"><i data-lucide="chevron-right"></i></button>
+                    <select class="select" id="selProject">
+                        <option value="all" selected>Todos Projetos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="hRight">
+                <button class="iconBtn" id="btnFilters" title="Filtros"><i data-lucide="search"></i></button>
+                <button class="iconBtn" title="Notificacoes">
+                    <i data-lucide="bell"></i><span class="notifDot"></span>
+                </button>
+                <div class="avatar" id="avatar">TT</div>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="titleBlock">
+                <h2>Acompanhamento de Horas</h2>
+                <p id="subtitle">Periodo do mes atual</p>
+            </div>
+
+            <div class="err" id="err"></div>
+
+            <div style="display:flex;flex-direction:column;gap:24px;">
+                <section class="gridStats">
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Horas Registradas</span>
+                                <div class="statIcon" style="color:var(--primary);background: color-mix(in oklch, var(--primary), transparent 88%);">
+                                    <i data-lucide="clock"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_total">—</div>
+                            <div class="statDetail" id="stat_total_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_total_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Cartoes com Horas</span>
+                                <div class="statIcon" style="color:var(--success);background: color-mix(in oklch, var(--success), transparent 88%);">
+                                    <i data-lucide="target"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_cards">—</div>
+                            <div class="statDetail" id="stat_cards_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_cards_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Media Diaria</span>
+                                <div class="statIcon" style="color:var(--warning);background: color-mix(in oklch, var(--warning), transparent 88%);">
+                                    <i data-lucide="trending-up"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_avg">—</div>
+                            <div class="statDetail" id="stat_avg_detail">—</div>
+                            <div class="statTrend trendDown" id="stat_avg_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Streak de Produtividade</span>
+                                <div class="statIcon" style="color:var(--chart-5);background: color-mix(in oklch, var(--chart-5), transparent 88%);">
+                                    <i data-lucide="flame"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_streak">—</div>
+                            <div class="statDetail" id="stat_streak_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_streak_trend">—</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid2">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Dia</div>
+                            <div class="legend">
+                                <span><span class="dot primary"></span>Registradas</span>
+                                <span><span class="dot muted"></span>Estimadas</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="chartWrap"><canvas id="chartDaily"></canvas></div>
+                            <div class="help" id="dailyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Mes</div>
+                            <div class="legend">
+                                <span><span class="dot primary"></span>Registradas</span>
+                                <span><span class="dot c2"></span>Estimadas</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="chartWrap"><canvas id="chartMonthly"></canvas></div>
+                            <div class="help" id="monthlyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid3">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Cartao</div>
+                            <div style="font-size:12px;color:var(--muted-foreground);" id="cardsCount">—</div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="list" id="cardsList"></div>
+                            <div class="help" id="cardsEmpty" style="display:none;margin-top:8px;">Sem cartões com horas no período.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:24px;">
+                        <div class="card">
+                            <div class="cardHeader"><div class="cardTitle">Progresso do Mes</div></div>
+                            <div class="cardBody">
+                                <div class="sprintWrap">
+                                    <div class="ring">
+                                        <svg viewBox="0 0 100 100">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--secondary)" stroke-width="8"></circle>
+                                            <circle id="ringProg" cx="50" cy="50" r="42" fill="none" stroke="var(--primary)" stroke-width="8"
+                                                    stroke-linecap="round" stroke-dasharray="0 264"></circle>
+                                        </svg>
+                                        <div class="ringCenter mono" id="ringPct">0%</div>
+                                    </div>
+                                    <div class="sprintLines">
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot est"></span>Estimativa</div>
+                                            <div class="lineVal mono" id="sprEst">—</div>
+                                        </div>
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot log"></span>Registradas</div>
+                                            <div class="lineVal mono" id="sprLog">—</div>
+                                        </div>
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot ot"></span>Hora Extra</div>
+                                            <div class="lineVal mono" id="sprOt">—</div>
+                                        </div>
+                                        <div class="lineItem" style="padding-top:6px;border-top:1px solid var(--border);">
+                                            <div class="lineLeft">Restantes</div>
+                                            <div class="lineVal mono" style="color:var(--warning)" id="sprRem">—</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="sectionLabel">Precisao das Estimativas</div>
+                                <div class="barRow" id="accuracyBars"></div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="cardHeader"><div class="cardTitle">Distribuicao por Projeto</div></div>
+                            <div class="cardBody">
+                                <div class="projWrap">
+                                    <div class="donut"><canvas id="chartProjects"></canvas></div>
+                                    <div class="projList" id="projectsList"></div>
+                                </div>
+                                <div class="help" id="projectsEmpty" style="display:none;margin-top:8px;">Sem dados por projeto no período.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid4">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Mapa de Calor Semanal</div>
+                            <div class="legend" style="gap:8px;font-size:11px">
+                                <span>Menos</span>
+                                <span class="dot" style="background:var(--secondary);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 80%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 55%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 30%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: var(--primary);border-radius:4px;width:12px;height:12px"></span>
+                                <span>Mais</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div style="overflow:auto">
+                                <table class="heatTable">
+                                    <thead>
+                                    <tr>
+                                        <th style="text-align:left;width:64px"></th>
+                                        <th style="text-align:center">Seg</th>
+                                        <th style="text-align:center">Ter</th>
+                                        <th style="text-align:center">Qua</th>
+                                        <th style="text-align:center">Qui</th>
+                                        <th style="text-align:center">Sex</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="heatBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Cartoes Revisados</div></div>
+                        <div class="cardBody">
+                            <div style="height:220px"><canvas id="chartReviewed"></canvas></div>
+                            <div class="help" id="reviewedEmpty" style="display:none;margin-top:8px;">Sem cartoes revisados no período.</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
+                        <div class="cardBody" style="max-height:260px;overflow:auto" id="dailyDetails"></div>
+                    </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Atividade Recente</div></div>
+                        <div class="cardBody">
+                            <div class="activity" id="activity"></div>
+                            <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
 </div>
 
-<div class="auth" id="authModal">
-  <div class="authBox">
-    <strong>Conexão Jira</strong>
-    <input class="input" id="baseUrl" placeholder="https://empresa.atlassian.net"/>
-    <input class="input" id="email" placeholder="email"/>
-    <input class="input" id="token" placeholder="token"/>
-    <button class="icon" id="saveAccount" style="width:100%;height:36px">Salvar e entrar</button>
-    <div class="muted">Contas salvas</div>
-    <div class="accounts" id="accounts"></div>
-  </div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Filtros">
+    <div class="drawer">
+        <div class="drawerHeader">
+            <div class="drawerTitle">Filtros</div>
+            <button class="drawerClose" onclick="closeFilters()" title="Fechar"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="field">
+            <label>De</label>
+            <input class="input" id="f_from" type="date">
+        </div>
+        <div class="field">
+            <label>Ate</label>
+            <input class="input" id="f_to" type="date">
+        </div>
+        <div class="field">
+            <label>Timezone</label>
+            <input class="input" id="f_tz" placeholder="America/Sao_Paulo">
+        </div>
+        <div class="field">
+            <label>Filtro (JQL ou texto)</label>
+            <input class="input" id="f_q" placeholder='mps  |  project = MPS  |  labels = mps'>
+            <div class="help">Se for texto solto, o backend converte para <code>text ~ "…"</code>. Se for JQL, use <code>campo operador valor</code>.</div>
+        </div>
+        <div class="field">
+            <label>Modo</label>
+            <select class="select2" id="f_mode">
+                <option value="auto" selected>Auto</option>
+                <option value="jql">Forcar JQL</option>
+                <option value="text">Forcar texto</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Autor no JQL</label>
+            <select class="select2" id="f_author">
+                <option value="auto" selected>Auto</option>
+                <option value="on">Ligado</option>
+                <option value="off">Desligado</option>
+            </select>
+            <div class="help">Auto tenta <code>worklogAuthor</code> e, se falhar, desliga sozinho.</div>
+        </div>
+        <div class="field">
+            <label>Concorrencia</label>
+            <select class="select2" id="f_c">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+            </select>
+            <div class="help">Se der erro 429 (rate limit), reduza.</div>
+        </div>
+
+        <div class="btnRow">
+            <button class="btn primary" id="btnApply"><i data-lucide="refresh-cw"></i>Aplicar</button>
+            <button class="btn" id="btnCsv"><i data-lucide="download"></i>CSV</button>
+        </div>
+
+        <div class="help">API: <code>/api/hours</code></div>
+    </div>
+    <div style="flex:1" onclick="closeFilters()"></div>
+</div>
+
+<div class="overlay" id="authOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Autenticacao">
+    <div class="drawer" style="width:min(460px,92vw)">
+        <div class="drawerHeader"><div class="drawerTitle">Conectar Jira</div></div>
+        <div class="field"><label>Base URL</label><input class="input" id="auth_base" placeholder="https://empresa.atlassian.net"></div>
+        <div class="field"><label>Email</label><input class="input" id="auth_email" placeholder="email@empresa.com"></div>
+        <div class="field"><label>Token</label><input class="input" id="auth_token" placeholder="token"></div>
+        <div class="btnRow"><button class="btn primary" id="btnAuthSave">Salvar e entrar</button><button class="btn" id="btnLogout">Deslogar</button></div>
+        <div class="help">Usuarios salvos</div>
+        <div id="authUsers" style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow:auto"></div>
+    </div>
+    <div style="flex:1"></div>
 </div>
 
 <script>
-const qs=id=>document.getElementById(id); const fmt2=n=>String(n).padStart(2,'0');
-const toHM=hours=>{const m=Math.round((Number(hours)||0)*60);return `${fmt2(Math.floor(m/60))}:${fmt2(m%60)}`};
-const fromSec=sec=>`${fmt2(Math.floor(sec/3600))}:${fmt2(Math.floor((sec%3600)/60))}`;
-const today=()=>new Date().toISOString().slice(0,10);
-const firstDay=(d)=>new Date(d.getFullYear(),d.getMonth(),1).toISOString().slice(0,10);
-let chartDaily,chartReview,state={month:new Date(),project:'all',payload:null,account:null,view:'dashboard'};
+    // --- tolerant icons (CDN may be blocked)
+    function safeIcons(){ try { window.lucide?.createIcons?.(); } catch (e) {} }
+    safeIcons();
 
-const STORAGE_KEYS={accounts:'jiraAccountsEnc',active:'activeJiraAccountEnc'};
-const APP_SECRET='time-jira-local-v1';
-const te=new TextEncoder(), td=new TextDecoder();
-function b64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)));}
-function unb64(str){return Uint8Array.from(atob(str),c=>c.charCodeAt(0));}
-async function deriveKey(salt){
-  const baseKey=await crypto.subtle.importKey('raw',te.encode(APP_SECRET+location.origin),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt:te.encode(salt),iterations:120000,hash:'SHA-256'},baseKey,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function encryptText(plain,salt){
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const key=await deriveKey(salt);
-  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,te.encode(plain));
-  return JSON.stringify({iv:b64(iv),ct:b64(ct)});
-}
-async function decryptText(payload,salt){
-  const obj=JSON.parse(payload||'{}');
-  if(!obj.iv||!obj.ct) throw new Error('payload invalido');
-  const key=await deriveKey(salt);
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(obj.iv)},key,unb64(obj.ct));
-  return td.decode(pt);
-}
-function accountSalt(a){return `${a?.baseUrl||''}|${a?.email||''}`}
-function icon(){try{lucide.createIcons()}catch{}}
-function monthRange(){const d=state.month, now=new Date();const from=firstDay(d);const same=d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();const to=same?today():new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);return {from,to};}
-function accountHeaders(){if(!state.account) throw new Error('Configure um usuário');return {'x-jira-base-url':state.account.baseUrl,'x-jira-email':state.account.email,'x-jira-token':state.account.token};}
-async function api(path){const r=await fetch(path,{headers:accountHeaders()});const j=await r.json();if(!r.ok||!j.ok) throw new Error(j.error||'Falha');return j;}
-function setSidebarMode(mode){localStorage.setItem('sidebarMode',mode);const s=qs('sidebar');s.className='sidebar'+(mode==='compact'?' compact':'')+(mode==='hidden'?' hidden':'');}
-function loadSidebarMode(){setSidebarMode(localStorage.getItem('sidebarMode')||'compact');}
-async function accounts(){
-  const raw=localStorage.getItem(STORAGE_KEYS.accounts);
-  if(!raw) return [];
-  try{
-    const envelope=JSON.parse(raw);
-    const plain=await decryptText(envelope.payload,envelope.salt||'accounts');
-    return JSON.parse(plain);
-  }catch{return [];}
-}
-async function saveAccounts(v){
-  const payload=await encryptText(JSON.stringify(v),'accounts');
-  localStorage.setItem(STORAGE_KEYS.accounts,JSON.stringify({salt:'accounts',payload}));
-}
-async function saveActiveAccount(a){
-  const payload=await encryptText(JSON.stringify(a),accountSalt(a));
-  localStorage.setItem(STORAGE_KEYS.active,JSON.stringify({salt:accountSalt(a),payload}));
-}
-async function readActiveAccount(){
-  const raw=localStorage.getItem(STORAGE_KEYS.active);
-  if(!raw) return null;
-  try{
-    const envelope=JSON.parse(raw);
-    const plain=await decryptText(envelope.payload,envelope.salt||'');
-    return JSON.parse(plain);
-  }catch{return null;}
-}
-async function renderAccounts(){
-  const list=await accounts();
-  qs('accounts').innerHTML=list.map((a,i)=>`<div class='acc'><span>${a.email}</span><div><button onclick='useAcc(${i})'>usar</button><button onclick='delAcc(${i})'>x</button></div></div>`).join('');
-}
-window.useAcc=async(i)=>{const list=await accounts();state.account=list[i];if(!state.account) return;await saveActiveAccount(state.account);qs('authModal').classList.remove('show');loadAll()}
-window.delAcc=async(i)=>{const a=await accounts();a.splice(i,1);await saveAccounts(a);await renderAccounts()}
-async function ensureAuth(){const active=await readActiveAccount();if(active){state.account=active}else qs('authModal').classList.add('show');await renderAccounts();}
-async function loadProjects(){const j=await api('/api/projects');const sel=qs('project');sel.innerHTML='<option value="all">Todos projetos</option>'+j.projects.map(p=>`<option value='${p.key}'>${p.name}</option>`).join('');sel.value=state.project;}
-function render(d){state.payload=d;qs('monthLabel').textContent=new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(state.month);qs('kTotal').textContent=toHM(d.totals.totalHours);qs('kCards').textContent=d.counts.cardsWithHours;qs('kAvg').textContent=toHM(d.totals.avgDaily);qs('kPct').textContent=`${d.sprintProgress.percentComplete}%`;qs('progressText').textContent=`${toHM(d.sprintProgress.loggedHours)} de ${toHM(d.sprintProgress.estimateHours)} (${toHM(d.sprintProgress.remainingHours)} restantes)`;
-  if(chartDaily) chartDaily.destroy(); if(chartReview) chartReview.destroy();
-  chartDaily=new Chart(qs('cDaily'),{type:'bar',data:{labels:d.dailyHoursChart.map(x=>x.day),datasets:[{data:d.dailyHoursChart.map(x=>x.logged),backgroundColor:'#4c8dff'}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false}});
-  chartReview=new Chart(qs('cReview'),{type:'line',data:{labels:d.reviewedCardsChart.map(x=>x.label),datasets:[{data:d.reviewedCardsChart.map(x=>x.reviewed),borderColor:'#3ac58f'}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false}});
-  qs('projectDist').innerHTML=d.projectDistribution.map(p=>`<div class='project-item'><span>${p.name}</span><span>${toHM(p.hours)}</span></div>`).join('')||'<div class="muted">Sem dados</div>';
-  qs('activity').innerHTML=(d.recentActivity||[]).map(a=>`<div class='project-item'><span>${a.key}</span><span>${toHM(a.hours)}</span></div>`).join('');
-  qs('dailyDetails').innerHTML=(d.dailyDetails||[]).map(day=>`<details><summary>${day.date} • ${day.formatted}</summary>${day.entries.map(e=>`<div class='entry'><div><strong>${e.key}</strong> ${e.title}<div class='muted'>${e.comment||''}</div></div><div>${e.formatted}</div></div>`).join('')}</details>`).join('')||'<div class="muted">Sem lançamentos no período.</div>';
-}
-async function loadAll(){const {from,to}=monthRange();const q=new URLSearchParams({from,to,tz:'America/Sao_Paulo',project:state.project,author:'auto',mode:'auto',c:'5'});await loadProjects();const data=await api('/api/hours?'+q.toString());render(data);}
-qs('prevMonth').onclick=()=>{state.month=new Date(state.month.getFullYear(),state.month.getMonth()-1,1);loadAll()};
-qs('nextMonth').onclick=()=>{state.month=new Date(state.month.getFullYear(),state.month.getMonth()+1,1);loadAll()};
-qs('project').onchange=e=>{state.project=e.target.value;loadAll()};
-qs('toggleSide').onclick=()=>{const s=qs('sidebar');setSidebarMode(s.classList.contains('compact')?'expanded':'compact')};
-qs('hideSide').onclick=()=>{setSidebarMode('hidden')};
-qs('openAuth').onclick=()=>qs('authModal').classList.add('show');
-qs('logout').onclick=()=>{localStorage.removeItem(STORAGE_KEYS.active);state.account=null;qs('authModal').classList.add('show')};
-qs('saveAccount').onclick=async()=>{const a={baseUrl:qs('baseUrl').value.trim(),email:qs('email').value.trim(),token:qs('token').value.trim()};if(!a.baseUrl||!a.email||!a.token)return;const arr=(await accounts()).filter(x=>!(x.baseUrl===a.baseUrl&&x.email===a.email));arr.unshift(a);await saveAccounts(arr);state.account=a;await saveActiveAccount(a);await renderAccounts();qs('authModal').classList.remove('show');loadAll()};
-for(const b of document.querySelectorAll('.nav button')) b.onclick=()=>{document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');const v=b.dataset.view;qs('dashboard').classList.toggle('hidden',v!=='dashboard');qs('reports').classList.toggle('active',v==='reports')}
-(async()=>{await ensureAuth();loadSidebarMode();icon();if(state.account) loadAll();})();
+    function showErr(msg){
+        const el = document.getElementById("err");
+        if (!msg){ el.style.display="none"; el.textContent=""; return; }
+        el.style.display="block"; el.textContent = msg;
+    }
+
+    const overlay = document.getElementById("overlay");
+    const sideOverlay = document.getElementById("sideOverlay");
+    function openFilters(){ overlay.style.display="flex"; }
+    function closeFilters(){ overlay.style.display="none"; }
+    function openSidebar(){ sideOverlay.style.display="flex"; }
+    function closeSidebar(){ sideOverlay.style.display="none"; }
+    window.closeFilters = closeFilters;
+    window.closeSidebar = closeSidebar;
+
+    document.getElementById("btnFilters").addEventListener("click", openFilters);
+    document.getElementById("btnMenu").addEventListener("click", openSidebar);
+
+    function ensureChart(){
+        if (!window.Chart){
+            showErr("Chart.js não carregou (CDN bloqueado/offline).");
+            return false;
+        }
+        return true;
+    }
+
+    // Defaults
+    function isoToday(){ return new Date().toISOString().slice(0,10); }
+    function firstDayOfMonth(d){ return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0,10); }
+    function lastDayOfMonth(d){ return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)).toISOString().slice(0,10); }
+    function toHm(hours){ const m = Math.round((Number(hours)||0)*60); return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; }
+    const f_from = document.getElementById("f_from");
+    const f_to = document.getElementById("f_to");
+    const f_tz = document.getElementById("f_tz");
+    const f_q = document.getElementById("f_q");
+    const f_mode = document.getElementById("f_mode");
+    const f_author = document.getElementById("f_author");
+    const f_c = document.getElementById("f_c");
+    const selProject = document.getElementById("selProject");
+    const monthLabel = document.getElementById("monthLabel");
+    const activeMonth = { d: new Date() };
+
+    const STORAGE_KEYS = { users: "jiraUsersEnc", active: "jiraActiveEnc" };
+    const APP_SECRET = "time-jira-local-v2";
+    const te = new TextEncoder(); const td = new TextDecoder();
+    function b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+    function ub64(s){ return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+    async function key(salt){ const base = await crypto.subtle.importKey("raw", te.encode(APP_SECRET + location.origin), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({name:"PBKDF2",salt:te.encode(salt),iterations:120000,hash:"SHA-256"}, base, {name:"AES-GCM",length:256}, false, ["encrypt","decrypt"]); }
+    async function enc(text,salt){ const iv=crypto.getRandomValues(new Uint8Array(12)); const k=await key(salt); const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k,te.encode(text)); return JSON.stringify({iv:b64(iv),ct:b64(ct)}); }
+    async function dec(payload,salt){ const o=JSON.parse(payload||"{}"); const k=await key(salt); const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(o.iv)},k,ub64(o.ct)); return td.decode(pt); }
+    async function getUsers(){ const raw=localStorage.getItem(STORAGE_KEYS.users); if(!raw) return []; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload,"users")); }catch{return [];} }
+    async function setUsers(users){ localStorage.setItem(STORAGE_KEYS.users, JSON.stringify({ payload: await enc(JSON.stringify(users), "users") })); }
+    async function getActive(){ const raw=localStorage.getItem(STORAGE_KEYS.active); if(!raw) return null; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload, e.salt||"active")); }catch{return null;} }
+    async function setActive(acc){ localStorage.setItem(STORAGE_KEYS.active, JSON.stringify({ salt:`${acc.baseUrl}|${acc.email}`, payload: await enc(JSON.stringify(acc), `${acc.baseUrl}|${acc.email}`) })); }
+    let account = null;
+
+    function syncMonthRange(){
+        const now = new Date();
+        const cur = activeMonth.d;
+        const same = cur.getUTCFullYear()===now.getUTCFullYear() && cur.getUTCMonth()===now.getUTCMonth();
+        f_from.value = firstDayOfMonth(cur);
+        f_to.value = same ? isoToday() : lastDayOfMonth(cur);
+        monthLabel.textContent = new Intl.DateTimeFormat("pt-BR", { month:"short", year:"numeric" }).format(cur);
+        document.getElementById("subtitle").textContent = `Periodo ${f_from.value} ate ${f_to.value}`;
+        document.getElementById("sprintLabel").textContent = monthLabel.textContent;
+    }
+
+    document.getElementById("btnPrevMonth").addEventListener("click", ()=>{ activeMonth.d = new Date(Date.UTC(activeMonth.d.getUTCFullYear(), activeMonth.d.getUTCMonth()-1, 1)); syncMonthRange(); load(); });
+    document.getElementById("btnNextMonth").addEventListener("click", ()=>{ activeMonth.d = new Date(Date.UTC(activeMonth.d.getUTCFullYear(), activeMonth.d.getUTCMonth()+1, 1)); syncMonthRange(); load(); });
+
+    async function loadProjects(){
+        if (!account) return;
+        const r = await fetch('/api/projects', { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || 'Falha ao carregar projetos');
+        selProject.innerHTML = `<option value="all">Todos Projetos</option>` + (j.projects||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join('');
+    }
+    selProject.addEventListener("change", ()=> load());
+
+    f_tz.value = "America/Sao_Paulo";
+    syncMonthRange();
+
+    // Charts
+    let chartDaily, chartMonthly, chartProjects, chartReviewed;
+    function destroy(c){ if (c) c.destroy(); return null; }
+
+    const COLORS = [
+        getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-2").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-3").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-4").trim(),
+    ];
+
+    function fmtH(h){ return toHm(h); }
+    function escapeHtml(s){ return String(s??"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c])); }
+
+    function badgeForStatus(status){
+        if (status==="done") return { cls:"success", label:"Concluido" };
+        if (status==="review") return { cls:"warning", label:"Em Revisao" };
+        if (status==="todo") return { cls:"", label:"A Fazer" };
+        return { cls:"primary", label:"Em Progresso" };
+    }
+    function badgeForPriority(p){
+        if (p==="high") return { cls:"chart5", label:"Alta" };
+        if (p==="low") return { cls:"", label:"Baixa" };
+        return { cls:"warning", label:"Media" };
+    }
+    function typeIcon(t){
+        if (t==="bug") return "bug";
+        if (t==="story") return "book-open";
+        if (t==="epic") return "layers";
+        return "wrench";
+    }
+
+    async function fetchDashboard(){
+        if (!account) throw new Error("Configure base URL, email e token.");
+        const params = new URLSearchParams({
+            from: f_from.value,
+            to: f_to.value,
+            tz: f_tz.value.trim(),
+            q: f_q.value.trim(),
+            mode: f_mode.value,
+            author: f_author.value,
+            c: f_c.value,
+            project: selProject.value || 'all'
+        });
+        const res = await fetch("/api/hours?" + params.toString(), { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data?.error || "Falha ao buscar dados.");
+        return data;
+    }
+
+    function renderStats(d){
+        const total = d.totals.totalHours || 0;
+        const est = d.totals.estimatedHoursRange || 0;
+        const delta = total - est;
+
+        document.getElementById("stat_total").textContent = fmtH(total);
+        document.getElementById("stat_total_detail").textContent = `de ${fmtH(est)} estimadas`;
+        const trendEl = document.getElementById("stat_total_trend");
+        trendEl.textContent = delta >= 0 ? `+${fmtH(delta)} acima da estimativa` : `${fmtH(delta)} abaixo da estimativa`;
+        trendEl.className = "statTrend " + (delta>=0 ? "trendUp":"trendDown");
+
+        document.getElementById("stat_cards").textContent = String(d.counts.cardsWithHours || 0);
+        document.getElementById("stat_cards_detail").textContent = `de ${d.counts.issues || 0} issues encontradas`;
+        document.getElementById("stat_cards_trend").textContent = `${d.counts.daysWithHours || 0} dias com horas`;
+        document.getElementById("stat_cards_trend").className = "statTrend trendUp";
+
+        const avg = d.totals.avgDaily || 0;
+        document.getElementById("stat_avg").textContent = fmtH(avg);
+        document.getElementById("stat_avg_detail").textContent = "meta: 8h";
+        const avgDelta = avg - 8;
+        const avgTrend = document.getElementById("stat_avg_trend");
+        avgTrend.textContent = avgDelta >= 0 ? `+${fmtH(avgDelta)} da meta` : `${fmtH(avgDelta)} da meta`;
+        avgTrend.className = "statTrend " + (avgDelta>=0 ? "trendUp":"trendDown");
+
+        const streak = d.totals.streakAbove7h || 0;
+        document.getElementById("stat_streak").textContent = `${streak} dias`;
+        document.getElementById("stat_streak_detail").textContent = "acima de 7h/dia";
+        document.getElementById("stat_streak_trend").textContent = "streak no fim do período";
+        document.getElementById("stat_streak_trend").className = "statTrend trendUp";
+
+        // Avatar initials
+        const initials = (d.user?.displayName || "TT").split(/\s+/).map(s=>s[0]).slice(0,2).join("").toUpperCase();
+        document.getElementById("avatar").textContent = initials || "TT";
+    }
+
+    function renderDailyChart(d){
+        if (!ensureChart()) return;
+        const rows = d.dailyHoursChart || [];
+        const labels = rows.map(x => x.day);
+        const logged = rows.map(x => x.logged);
+        const estimated = rows.map(x => x.estimated);
+        document.getElementById("dailyEmpty").style.display = labels.length ? "none" : "block";
+        chartDaily = destroy(chartDaily);
+        if (!labels.length) return;
+
+        chartDaily = new Chart(document.getElementById("chartDaily"), {
+            data: {
+                labels,
+                datasets: [
+                    { type:"bar", label:"Registradas", data: logged, borderWidth:0, borderRadius:6, backgroundColor: COLORS[0] },
+                    { type:"line", label:"Estimadas", data: estimated, borderWidth:2, tension:0.25, pointRadius:0,
+                        borderColor: "rgba(255,255,255,.35)", borderDash:[4,4] }
+                ]
+            },
+            options:{
+                responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{display:false},
+                    tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}h` } } },
+                scales:{
+                    x:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{display:false}},
+                    y:{ beginAtZero:true, ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{color:"rgba(255,255,255,.08)"}}
+                }
+            }
+        });
+    }
+
+    function renderMonthlyChart(d){
+        if (!ensureChart()) return;
+        const rows = d.monthlyHours || [];
+        const labels = rows.map(x => x.month);
+        const logged = rows.map(x => x.logged);
+        const est = rows.map(x => x.estimated);
+        document.getElementById("monthlyEmpty").style.display = labels.length ? "none" : "block";
+        chartMonthly = destroy(chartMonthly);
+        if (!labels.length) return;
+
+        chartMonthly = new Chart(document.getElementById("chartMonthly"), {
+            type:"line",
+            data:{ labels, datasets:[
+                    { label:"Estimadas", data: est, borderWidth:2, tension:0.25, pointRadius:0, borderColor: COLORS[1] },
+                    { label:"Registradas", data: logged, borderWidth:2, tension:0.25, pointRadius:0, borderColor: COLORS[0] }
+                ]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+                scales:{ x:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{display:false}},
+                    y:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{color:"rgba(255,255,255,.08)"}} }
+            }
+        });
+    }
+
+    function renderCardsList(d){
+        const list = document.getElementById("cardsList");
+        const cards = d.cards || [];
+        document.getElementById("cardsCount").textContent = `${cards.length} cartoes`;
+        document.getElementById("cardsEmpty").style.display = cards.length ? "none" : "block";
+
+        list.innerHTML = cards.map(c => {
+            const status = badgeForStatus(c.status);
+            const pr = badgeForPriority(c.priority);
+            const progress = c.estimatedHours > 0 ? Math.min((c.loggedHours / c.estimatedHours) * 100, 100) : 0;
+            const over = c.estimatedHours > 0 && c.loggedHours > c.estimatedHours;
+
+            return `
+          <div class="jiraCard">
+            <div class="row">
+              <div style="margin-top:2px;color:var(--muted-foreground)"><i data-lucide="${typeIcon(c.type)}"></i></div>
+              <div class="grow">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                  <div class="grow" style="min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                      <span class="key mono">${escapeHtml(c.key)}</span>
+                      <span class="badge ${status.cls}">${status.label}</span>
+                      <span class="badge ${pr.cls}">${pr.label}</span>
+                    </div>
+                    <div class="title">${escapeHtml(c.title)}</div>
+                  </div>
+                  <div class="avatar" style="width:28px;height:28px;font-size:11px;margin-left:0">${escapeHtml(c.avatarInitials || "TT")}</div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+                  <div class="progress ${over ? "over" : ""}" style="flex:1;">
+                    <div style="width:${progress.toFixed(0)}%"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">
+                    <span class="mono" style="font-weight:800;color:${over ? "var(--chart-5)" : "var(--foreground)"}">${c.loggedHours.toFixed(1)}h</span>
+                    <span style="color:var(--muted-foreground)">/</span>
+                    <span class="mono" style="color:var(--muted-foreground)">${(c.estimatedHours||0).toFixed(1)}h</span>
+                  </div>
+                </div>
+
+                <div class="subline">
+                  <span>${escapeHtml(c.project || "—")}</span><span>·</span>
+                  <span>${escapeHtml(c.sprint || "—")}</span><span>·</span>
+                  <span style="text-transform:capitalize">${escapeHtml(c.type)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join("");
+
+        safeIcons();
+    }
+
+    function renderSprint(d){
+        const sp = d.sprintProgress || {};
+        const pct = sp.percentComplete || 0;
+        document.getElementById("ringPct").textContent = pct + "%";
+        const dash = pct * 2.64;
+        document.getElementById("ringProg").setAttribute("stroke-dasharray", `${dash} ${264 - dash}`);
+
+        document.getElementById("sprEst").textContent = fmtH(sp.estimateHours || 0);
+        document.getElementById("sprLog").textContent = fmtH(sp.loggedHours || 0);
+        document.getElementById("sprOt").textContent = fmtH(sp.overtimeHours || 0);
+        document.getElementById("sprRem").textContent = fmtH(sp.remainingHours || 0);
+
+        // Accuracy bars: heuristic from percentComplete
+        const within = Math.max(0, Math.min(100, 50 + (pct - 50) * 0.2));
+        const above = Math.max(0, Math.min(100, (sp.overtimeHours || 0) * 5));
+        const below = Math.max(0, 100 - within - above);
+
+        const rows = [
+            { label: "Dentro da estimativa", percentage: within, count: Math.round(within/10) },
+            { label: "Abaixo da estimativa", percentage: below, count: Math.round(below/10) },
+            { label: "Acima da estimativa", percentage: above, count: Math.round(above/10) },
+        ];
+
+        document.getElementById("accuracyBars").innerHTML = rows.map(r => `
+        <div class="barItem">
+          <div class="top"><span>${r.label}</span><span style="color:var(--muted-foreground)">${r.count} (${Math.round(r.percentage)}%)</span></div>
+          <div class="bar"><div style="width:${Math.round(r.percentage)}%"></div></div>
+        </div>
+      `).join("");
+    }
+
+    function renderProjects(d){
+        if (!ensureChart()) return;
+        const items = d.projectDistribution || [];
+        const labels = items.map(x => x.name);
+        const values = items.map(x => x.hours);
+        const empty = !labels.length;
+        document.getElementById("projectsEmpty").style.display = empty ? "block" : "none";
+        chartProjects = destroy(chartProjects);
+
+        if (!labels.length){
+            document.getElementById("projectsList").innerHTML = "";
+            return;
+        }
+
+        chartProjects = new Chart(document.getElementById("chartProjects"), {
+            type:"doughnut",
+            data:{ labels, datasets:[{ data: values, backgroundColor: items.map((_,i)=> COLORS[i%COLORS.length]), borderWidth:0, hoverOffset:6 }]},
+            options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{ legend:{display:false} } }
+        });
+
+        const list = document.getElementById("projectsList");
+        list.innerHTML = items.map((p, i) => `
+        <div class="projItem">
+          <div style="width:10px;height:10px;border-radius:999px;background:${COLORS[i % COLORS.length]}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="projNameRow">
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(p.name)}</span>
+              <span class="mono" style="color:var(--muted-foreground)">${p.hours.toFixed(1)}h</span>
+            </div>
+            <div class="projBar"><div style="width:${p.percentage}%;background:${COLORS[i % COLORS.length]}"></div></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function heatIntensity(hours){
+        if (hours === 0) return "var(--secondary)";
+        if (hours < 7) return "color-mix(in oklch, var(--primary), transparent 80%)";
+        if (hours <= 8) return "color-mix(in oklch, var(--primary), transparent 55%)";
+        if (hours <= 9) return "color-mix(in oklch, var(--primary), transparent 30%)";
+        return "var(--primary)";
+    }
+
+    function renderHeatmap(d){
+        const rows = d.weeklyHeatmap || [];
+        const tbody = document.getElementById("heatBody");
+        tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td style="color:var(--muted-foreground);padding-right:10px">${escapeHtml(r.week)}</td>
+          ${["seg","ter","qua","qui","sex"].map(k => {
+            const h = Number(r[k] || 0);
+            const bg = heatIntensity(h);
+            const txt = h > 0 ? `${h}h` : "-";
+            return `<td style="text-align:center"><div class="heatCell" title="${h}h" style="background:${bg}"><span class="mono" style="font-size:10px">${txt}</span></div></td>`;
+        }).join("")}
+        </tr>
+      `).join("");
+    }
+
+    function renderTeam(d){
+        const members = d.teamPerformance || [];
+        const box = document.getElementById("teamBox");
+        const max = Math.max(1, ...members.map(m => Number(m.totalHours || 0)));
+        box.innerHTML = members.map(m => {
+            const w = (Number(m.totalHours || 0) / max) * 100;
+            return `
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="avatar" style="margin-left:0">${escapeHtml(m.initials || "TT")}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px">
+                <span style="font-weight:600">${escapeHtml(m.name || "—")}</span>
+                <span class="mono" style="font-weight:800">${Number(m.totalHours || 0).toFixed(1)}h</span>
+              </div>
+              <div class="progress"><div style="width:${w.toFixed(0)}%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--muted-foreground)">
+                <span>${Number(m.cardsDone || 0)} cartoes</span>
+                <span>media ${Number(m.avgPerCard || 0).toFixed(1)}h/cartao</span>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join("");
+    }
+
+    function renderReviewed(d){
+        if (!ensureChart()) return;
+        const items = d.reviewedCardsChart || [];
+        const labels = items.map(x => x.label);
+        const values = items.map(x => x.reviewed);
+        const empty = !labels.length;
+        document.getElementById("reviewedEmpty").style.display = empty ? "block" : "none";
+        chartReviewed = destroy(chartReviewed);
+        if (empty) return;
+
+        chartReviewed = new Chart(document.getElementById("chartReviewed"), {
+            type:"line",
+            data:{ labels, datasets:[{ label:"Revisados", data: values, borderWidth:2, borderColor: COLORS[1], backgroundColor:"rgba(0,0,0,0)" }]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} } }
+        });
+    }
+
+    function statusDotStyle(status){
+        if (status==="done") return "background: var(--success)";
+        if (status==="in_progress") return "background: var(--primary)";
+        if (status==="review") return "background: var(--warning)";
+        return "background: var(--muted-foreground)";
+    }
+
+    function renderActivity(d){
+        const items = d.recentActivity || [];
+        const box = document.getElementById("activity");
+        document.getElementById("activityEmpty").style.display = items.length ? "none" : "block";
+
+        box.innerHTML = items.map((a, idx) => `
+        <div class="actRow">
+          <div class="actLine">
+            <div class="actDot" style="${statusDotStyle(a.status)}"></div>
+            ${idx < items.length - 1 ? `<div class="actStick"></div>` : ``}
+          </div>
+          <div class="actBody">
+            <div class="actTitle">${escapeHtml(a.title)}</div>
+            <div class="actMeta">
+              <span class="mono" style="color:var(--primary)">${escapeHtml(a.key)}</span>
+              <span>${escapeHtml(a.assignee || "")}</span>
+              <span class="right">${escapeHtml(a.dateLabel || "")}</span>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+
+    function renderDailyDetails(d){
+        const box = document.getElementById("dailyDetails");
+        const items = d.dailyDetails || [];
+        box.innerHTML = items.length ? items.map(day => `
+          <details style="margin-bottom:8px"><summary>${day.date} · ${day.formatted}</summary>
+            ${(day.entries||[]).map(e => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--border)"><div><div class="mono" style="color:var(--primary)">${escapeHtml(e.key)}</div><div>${escapeHtml(e.title)}</div></div><div class="mono">${escapeHtml(e.formatted)}</div></div>`).join("")}
+          </details>
+        `).join("") : '<div class="help">Sem detalhes no período.</div>';
+    }
+
+    function downloadCsv(series, from, to){
+        const header = ["date","hours","seconds"];
+        const lines = [header.join(",")].concat(
+            (series || []).map(x => [x.date, Number(x.hours||0).toFixed(2), Number(x.seconds||0)].join(","))
+        );
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `jira-hours-${from}_to_${to}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    let lastPayload = null;
+
+    async function load(){
+        const btnApply = document.getElementById("btnApply");
+        const btnCsv = document.getElementById("btnCsv");
+        const oldLabel = btnApply.innerHTML;
+        btnApply.disabled = true;
+        btnCsv.disabled = true;
+        btnApply.innerHTML = `<i data-lucide="loader-2"></i>Carregando...`;
+        safeIcons();
+
+        try{
+            const d = await fetchDashboard();
+            lastPayload = d;
+
+            renderStats(d);
+            renderDailyChart(d);
+            renderMonthlyChart(d);
+            renderCardsList(d);
+            renderSprint(d);
+            renderProjects(d);
+            renderHeatmap(d);
+            renderReviewed(d);
+            renderDailyDetails(d);
+            renderActivity(d);
+
+            showErr("");
+            closeFilters();
+        }catch(e){
+            showErr(String(e?.message || e));
+        }finally{
+            btnApply.disabled = false;
+            btnCsv.disabled = false;
+            btnApply.innerHTML = oldLabel;
+            safeIcons();
+        }
+    }
+
+    document.getElementById("btnApply").addEventListener("click", load);
+    document.getElementById("btnCsv").addEventListener("click", () => {
+        if (!lastPayload) return;
+        downloadCsv(lastPayload.series, lastPayload.query.from, lastPayload.query.to);
+    });
+
+
+    async function refreshUsers(){
+        const users = await getUsers();
+        const box = document.getElementById("authUsers");
+        box.innerHTML = users.map((u,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--secondary);padding:8px;border-radius:10px"><span>${escapeHtml(u.email)}</span><div style="display:flex;gap:6px"><button class="btn" onclick="useUser(${i})">Usar</button><button class="btn" onclick="delUser(${i})">X</button></div></div>`).join("");
+    }
+    window.useUser = async (i)=>{ const users = await getUsers(); account = users[i]; if (!account) return; await setActive(account); document.getElementById("authOverlay").style.display="none"; await loadProjects(); load(); };
+    window.delUser = async (i)=>{ const users = await getUsers(); users.splice(i,1); await setUsers(users); await refreshUsers(); };
+
+    document.getElementById("avatar").addEventListener("click", async ()=>{ document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); });
+    document.getElementById("btnLogout").addEventListener("click", ()=>{ localStorage.removeItem(STORAGE_KEYS.active); account = null; document.getElementById("authOverlay").style.display="flex"; });
+    document.getElementById("btnAuthSave").addEventListener("click", async ()=>{
+        const acc = { baseUrl: document.getElementById("auth_base").value.trim(), email: document.getElementById("auth_email").value.trim(), token: document.getElementById("auth_token").value.trim() };
+        if (!acc.baseUrl || !acc.email || !acc.token) return;
+        const users = (await getUsers()).filter(u => !(u.baseUrl===acc.baseUrl && u.email===acc.email));
+        users.unshift(acc); await setUsers(users); await setActive(acc); account = acc;
+        document.getElementById("authOverlay").style.display="none";
+        await refreshUsers();
+        await loadProjects();
+        load();
+    });
+
+    // Enter to apply
+    [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
+
+    (async () => { account = await getActive(); if (!account) { document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); return; } await loadProjects(); load(); })();
 </script>
 </body>
 </html>
