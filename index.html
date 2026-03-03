@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Time Tracker - Acompanhamento de Horas</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root{
+            /* similar to app/globals.css from the zip */
+            --background: oklch(0.13 0.005 260);
+            --foreground: oklch(0.95 0 0);
+            --card: oklch(0.17 0.005 260);
+            --popover: oklch(0.17 0.005 260);
+            --primary: oklch(0.65 0.18 230);
+            --primary-foreground: oklch(0.98 0 0);
+            --secondary: oklch(0.22 0.005 260);
+            --muted-foreground: oklch(0.65 0 0);
+            --border: oklch(0.26 0.005 260);
+            --success: oklch(0.72 0.17 165);
+            --warning: oklch(0.75 0.18 80);
+            --chart-2: oklch(0.72 0.17 165);
+            --chart-3: oklch(0.75 0.18 80);
+            --chart-4: oklch(0.60 0.20 300);
+            --chart-5: oklch(0.65 0.22 25);
+            --destructive: oklch(0.55 0.22 27);
+            --radius: 12px;
+        }
+
+        *{box-sizing:border-box}
+        html,body{height:100%}
+        body{
+            margin:0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+        }
+        .mono{font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+
+        .app{display:flex;height:100vh;overflow:hidden}
+        .sidebar{
+            width:256px;background:var(--card);border-right:1px solid var(--border);
+            padding:24px 12px;display:none;flex-direction:column;gap:4px;
+        }
+        @media(min-width:1024px){.sidebar{display:flex}}
+        .brand{display:flex;gap:12px;align-items:center;padding:0 12px;margin-bottom:28px}
+        .brandIcon{
+            width:36px;height:36px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);
+            display:flex;align-items:center;justify-content:center;
+        }
+        .brandTitle{font-size:14px;font-weight:700;line-height:1.1}
+        .brandSub{font-size:12px;color:var(--muted-foreground);margin-top:2px}
+
+        .nav{display:flex;flex-direction:column;gap:4px}
+        .navBtn{
+            border:0;background:transparent;color:var(--muted-foreground);
+            padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:10px;
+            font-weight:600;cursor:pointer;transition:.15s;text-align:left;
+        }
+        .navBtn:hover{background:var(--secondary);color:var(--foreground)}
+        .navBtn.active{background:color-mix(in oklch, var(--primary), transparent 85%);color:var(--primary)}
+        .sidebarFooter{margin-top:auto;padding:0 12px}
+        .sprintCard{background:var(--secondary);border-radius:12px;padding:14px}
+        .sprintCard .k{font-size:12px;font-weight:700}
+        .sprintCard .v{font-size:18px;font-weight:800;color:var(--primary);margin-top:2px}
+        .sprintCard .d{font-size:12px;color:var(--muted-foreground);margin-top:6px}
+
+        .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+        .header{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border);
+        }
+        @media(min-width:1024px){.header{padding:12px 24px}}
+        .hLeft{display:flex;align-items:center;gap:12px}
+        .iconBtn{
+            width:36px;height:36px;border-radius:12px;border:0;background:transparent;color:var(--muted-foreground);
+            display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative;
+        }
+        .iconBtn:hover{background:var(--secondary);color:var(--foreground)}
+        #btnMenu{display:flex}
+        @media(min-width:1024px){#btnMenu{display:none}}
+
+        .select{
+            height:32px;border-radius:10px;padding:0 10px;border:1px solid var(--border);
+            background:var(--secondary);color:var(--foreground);font-size:12px;outline:none;
+        }
+        .hSelects{display:none;align-items:center;gap:10px}
+        @media(min-width:640px){.hSelects{display:flex}}
+        .hRight{display:flex;align-items:center;gap:6px}
+        .notifDot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:999px;background:var(--primary)}
+        .avatar{
+            width:32px;height:32px;border-radius:999px;background:color-mix(in oklch, var(--primary), transparent 88%);
+            color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-left:6px;
+        }
+
+        .content{flex:1;overflow:auto;padding:16px}
+        @media(min-width:1024px){.content{padding:24px}}
+        .titleBlock{margin-bottom:24px}
+        .titleBlock h2{margin:0;font-size:20px;font-weight:700}
+        .titleBlock p{margin:6px 0 0 0;font-size:13px;color:var(--muted-foreground)}
+
+        .gridStats{display:grid;grid-template-columns:1fr;gap:16px}
+        @media(min-width:640px){.gridStats{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1280px){.gridStats{grid-template-columns:repeat(4,1fr)}}
+
+        .grid2{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:1280px){.grid2{grid-template-columns:repeat(2,1fr)}}
+
+        .grid3{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:1280px){.grid3{grid-template-columns:2fr 1fr}}
+
+        .grid4{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:768px){.grid4{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1280px){.grid4{grid-template-columns:repeat(4,1fr)}}
+
+        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+        .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between}
+        .cardTitle{font-size:13px;font-weight:650}
+        .cardBody{padding:0 18px 18px 18px}
+
+        .statLabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600}
+        .statIcon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+        .statValue{font-size:26px;font-weight:800}
+        .statDetail{font-size:12px;color:var(--muted-foreground);margin-top:2px}
+        .statTrend{font-size:12px;font-weight:650;margin-top:10px}
+        .trendUp{color:var(--success)}
+        .trendDown{color:var(--warning)}
+
+        .legend{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted-foreground)}
+        .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px;vertical-align:middle}
+        .dot.primary{background:var(--primary)}
+        .dot.muted{background:color-mix(in oklch, var(--muted-foreground), transparent 70%)}
+        .dot.c2{background:var(--chart-2)}
+        .chartWrap{height:260px;}
+
+        .err{
+            display:none;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid color-mix(in oklch, var(--destructive), transparent 60%);
+            background:color-mix(in oklch, var(--destructive), transparent 85%);
+            color:color-mix(in oklch, var(--foreground), transparent 10%);
+            white-space:pre-wrap;
+            font-size:12px;
+            margin-bottom: 16px;
+        }
+
+        /* Cards list */
+        .list{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding-right:4px}
+        .jiraCard{
+            border:1px solid var(--border);
+            background:color-mix(in oklch, var(--secondary), transparent 70%);
+            border-radius:14px;padding:14px;transition:.15s;
+        }
+        .jiraCard:hover{background:color-mix(in oklch, var(--secondary), transparent 45%)}
+        .row{display:flex;gap:12px;align-items:flex-start}
+        .grow{flex:1;min-width:0}
+        .badge{
+            display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;
+            font-size:10px;border:1px solid var(--border);color:var(--muted-foreground);background:transparent;white-space:nowrap;
+        }
+        .badge.primary{border-color:color-mix(in oklch,var(--primary),transparent 75%);background:color-mix(in oklch,var(--primary),transparent 88%);color:var(--primary)}
+        .badge.success{border-color:color-mix(in oklch,var(--success),transparent 75%);background:color-mix(in oklch,var(--success),transparent 88%);color:var(--success)}
+        .badge.warning{border-color:color-mix(in oklch,var(--warning),transparent 75%);background:color-mix(in oklch,var(--warning),transparent 88%);color:var(--warning)}
+        .badge.chart5{border-color:color-mix(in oklch,var(--chart-5),transparent 75%);background:color-mix(in oklch,var(--chart-5),transparent 88%);color:var(--chart-5)}
+        .key{font-size:12px;color:var(--primary);font-weight:650}
+        .title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .progress{height:6px;border-radius:999px;background:var(--secondary);overflow:hidden}
+        .progress>div{height:100%;background:var(--primary);border-radius:999px}
+        .progress.over>div{background:var(--chart-5)}
+
+        .subline{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted-foreground)}
+
+        /* Sprint progress */
+        .sprintWrap{display:flex;gap:16px;align-items:center}
+        .ring{width:96px;height:96px;position:relative;flex:0 0 auto}
+        .ring svg{width:96px;height:96px;transform: rotate(-90deg)}
+        .ringCenter{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800}
+        .sprintLines{flex:1;display:flex;flex-direction:column;gap:8px}
+        .lineItem{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+        .lineLeft{display:flex;align-items:center;gap:8px;color:var(--muted-foreground)}
+        .miniDot{width:10px;height:10px;border-radius:999px}
+        .miniDot.est{background:color-mix(in oklch,var(--muted-foreground),transparent 70%)}
+        .miniDot.log{background:var(--primary)}
+        .miniDot.ot{background:var(--chart-5)}
+        .lineVal{font-weight:750}
+
+        .sectionLabel{margin-top:16px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700}
+        .barRow{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+        .barItem .top{display:flex;justify-content:space-between;font-size:12px}
+        .barItem .bar{height:6px;background:var(--secondary);border-radius:999px;overflow:hidden;margin-top:6px}
+        .barItem .bar>div{height:100%;background:color-mix(in oklch,var(--primary),transparent 35%);border-radius:999px}
+
+        /* Project distribution */
+        .projWrap{display:flex;gap:16px;align-items:center}
+        .donut{width:180px;height:180px;flex:0 0 auto}
+        .projList{flex:1;display:flex;flex-direction:column;gap:12px}
+        .projItem{display:flex;gap:10px;align-items:center}
+        .projNameRow{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+        .projBar{height:6px;background:var(--secondary);border-radius:999px;overflow:hidden;margin-top:6px}
+        .projBar>div{height:100%;border-radius:999px}
+
+        /* Heatmap */
+        .heatTable{width:100%;border-collapse:collapse}
+        .heatTable th,.heatTable td{padding:6px 6px;font-size:12px}
+        .heatTable th{color:var(--muted-foreground);font-weight:500}
+        .heatCell{
+            min-width:36px;aspect-ratio:1/1;border-radius:10px;display:flex;align-items:center;justify-content:center;
+            background:var(--secondary);border:1px solid color-mix(in oklch,var(--border),transparent 25%);
+            color:color-mix(in oklch,var(--foreground),transparent 25%);
+        }
+
+        /* Recent activity */
+        .activity{display:flex;flex-direction:column;gap:14px}
+        .actRow{display:flex;gap:12px;align-items:flex-start}
+        .actLine{display:flex;flex-direction:column;align-items:center}
+        .actDot{width:10px;height:10px;border-radius:999px;margin-top:6px}
+        .actStick{width:1px;flex:1;background:var(--border);margin-top:6px}
+        .actBody{flex:1;min-width:0;padding-bottom:14px}
+        .actTitle{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .actMeta{margin-top:6px;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted-foreground)}
+        .actMeta .right{margin-left:auto}
+
+        /* Overlay drawer */
+        .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:stretch;justify-content:flex-end;z-index:50}
+        .drawer{width:min(420px,92vw);background:var(--card);border-left:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:12px}
+        .drawerHeader{display:flex;align-items:center;justify-content:space-between}
+        .drawerTitle{font-weight:800}
+        .drawerClose{border:0;background:transparent;color:var(--muted-foreground);cursor:pointer}
+        .drawerClose:hover{color:var(--foreground)}
+        .field{display:flex;flex-direction:column;gap:6px}
+        .field label{font-size:12px;color:var(--muted-foreground)}
+        .input,.select2{height:40px;border-radius:12px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);padding:0 12px;outline:none;font-size:13px}
+        .help{font-size:12px;color:var(--muted-foreground);line-height:1.35}
+        .btnRow{display:flex;gap:10px;margin-top:8px}
+        .btn{height:40px;border-radius:12px;padding:0 12px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);cursor:pointer;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px}
+        .btn.primary{background:var(--primary);border-color:transparent;color:var(--primary-foreground)}
+        .btn:disabled{opacity:.65;cursor:not-allowed}
+
+        /* Mobile sidebar sheet */
+        .sideOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:60;align-items:stretch;justify-content:flex-start}
+        .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
+
+        code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
+    </style>
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brandIcon"><i data-lucide="clock"></i></div>
+            <div>
+                <div class="brandTitle">Time Tracker</div>
+                <div class="brandSub">Jira Integration</div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
+            <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
+            <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+            <button class="navBtn"><i data-lucide="users"></i>Equipe</button>
+            <button class="navBtn"><i data-lucide="calendar"></i>Sprints</button>
+            <button class="navBtn"><i data-lucide="trending-up"></i>Produtividade</button>
+        </nav>
+
+        <div class="sidebarFooter">
+            <div class="sprintCard">
+                <div class="k">Sprint Atual</div>
+                <div class="v mono" id="sprintLabel">Sprint 14</div>
+                <div class="d" id="sprintHint">Período selecionado</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="sideOverlay" id="sideOverlay" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="sideSheet">
+            <div class="brand" style="padding:0 12px;margin-bottom:18px;">
+                <div class="brandIcon"><i data-lucide="clock"></i></div>
+                <div>
+                    <div class="brandTitle">Time Tracker</div>
+                    <div class="brandSub">Jira Integration</div>
+                </div>
+            </div>
+            <nav class="nav">
+                <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
+                <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
+                <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+                <button class="navBtn"><i data-lucide="users"></i>Equipe</button>
+                <button class="navBtn"><i data-lucide="calendar"></i>Sprints</button>
+                <button class="navBtn"><i data-lucide="trending-up"></i>Produtividade</button>
+            </nav>
+            <div class="sidebarFooter">
+                <div class="sprintCard">
+                    <div class="k">Sprint Atual</div>
+                    <div class="v mono">Sprint 14</div>
+                    <div class="d">Período selecionado</div>
+                </div>
+            </div>
+        </div>
+        <div style="flex:1" onclick="closeSidebar()"></div>
+    </div>
+
+    <div class="main">
+        <header class="header">
+            <div class="hLeft">
+                <button class="iconBtn" id="btnMenu" title="Menu"><i data-lucide="menu"></i></button>
+                <div class="hSelects">
+                    <select class="select" id="selSprint">
+                        <option value="sprint-13">Sprint 13</option>
+                        <option value="sprint-14" selected>Sprint 14</option>
+                        <option value="sprint-15">Sprint 15</option>
+                    </select>
+                    <select class="select" id="selProject">
+                        <option value="all" selected>Todos Projetos</option>
+                        <option value="portal">Portal Web</option>
+                        <option value="ecommerce">E-commerce</option>
+                        <option value="infra">Infraestrutura</option>
+                        <option value="mobile">Mobile App</option>
+                    </select>
+                </div>
+            </div>
+            <div class="hRight">
+                <button class="iconBtn" id="btnFilters" title="Filtros"><i data-lucide="search"></i></button>
+                <button class="iconBtn" title="Notificacoes">
+                    <i data-lucide="bell"></i><span class="notifDot"></span>
+                </button>
+                <div class="avatar" id="avatar">TT</div>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="titleBlock">
+                <h2>Acompanhamento de Horas</h2>
+                <p id="subtitle">Sprint 14 - Fevereiro 2026</p>
+            </div>
+
+            <div class="err" id="err"></div>
+
+            <div style="display:flex;flex-direction:column;gap:24px;">
+                <section class="gridStats">
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Horas Registradas</span>
+                                <div class="statIcon" style="color:var(--primary);background: color-mix(in oklch, var(--primary), transparent 88%);">
+                                    <i data-lucide="clock"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_total">—</div>
+                            <div class="statDetail" id="stat_total_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_total_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Cartoes com Horas</span>
+                                <div class="statIcon" style="color:var(--success);background: color-mix(in oklch, var(--success), transparent 88%);">
+                                    <i data-lucide="target"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_cards">—</div>
+                            <div class="statDetail" id="stat_cards_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_cards_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Media Diaria</span>
+                                <div class="statIcon" style="color:var(--warning);background: color-mix(in oklch, var(--warning), transparent 88%);">
+                                    <i data-lucide="trending-up"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_avg">—</div>
+                            <div class="statDetail" id="stat_avg_detail">—</div>
+                            <div class="statTrend trendDown" id="stat_avg_trend">—</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardBody" style="padding-top:18px">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                                <span class="statLabel">Streak de Produtividade</span>
+                                <div class="statIcon" style="color:var(--chart-5);background: color-mix(in oklch, var(--chart-5), transparent 88%);">
+                                    <i data-lucide="flame"></i>
+                                </div>
+                            </div>
+                            <div class="statValue mono" id="stat_streak">—</div>
+                            <div class="statDetail" id="stat_streak_detail">—</div>
+                            <div class="statTrend trendUp" id="stat_streak_trend">—</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid2">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Dia</div>
+                            <div class="legend">
+                                <span><span class="dot primary"></span>Registradas</span>
+                                <span><span class="dot muted"></span>Estimadas</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="chartWrap"><canvas id="chartDaily"></canvas></div>
+                            <div class="help" id="dailyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Mes</div>
+                            <div class="legend">
+                                <span><span class="dot primary"></span>Registradas</span>
+                                <span><span class="dot c2"></span>Estimadas</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="chartWrap"><canvas id="chartMonthly"></canvas></div>
+                            <div class="help" id="monthlyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid3">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Horas por Cartao</div>
+                            <div style="font-size:12px;color:var(--muted-foreground);" id="cardsCount">—</div>
+                        </div>
+                        <div class="cardBody">
+                            <div class="list" id="cardsList"></div>
+                            <div class="help" id="cardsEmpty" style="display:none;margin-top:8px;">Sem cartões com horas no período.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:24px;">
+                        <div class="card">
+                            <div class="cardHeader"><div class="cardTitle">Progresso do Sprint</div></div>
+                            <div class="cardBody">
+                                <div class="sprintWrap">
+                                    <div class="ring">
+                                        <svg viewBox="0 0 100 100">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--secondary)" stroke-width="8"></circle>
+                                            <circle id="ringProg" cx="50" cy="50" r="42" fill="none" stroke="var(--primary)" stroke-width="8"
+                                                    stroke-linecap="round" stroke-dasharray="0 264"></circle>
+                                        </svg>
+                                        <div class="ringCenter mono" id="ringPct">0%</div>
+                                    </div>
+                                    <div class="sprintLines">
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot est"></span>Estimativa</div>
+                                            <div class="lineVal mono" id="sprEst">—</div>
+                                        </div>
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot log"></span>Registradas</div>
+                                            <div class="lineVal mono" id="sprLog">—</div>
+                                        </div>
+                                        <div class="lineItem">
+                                            <div class="lineLeft"><span class="miniDot ot"></span>Hora Extra</div>
+                                            <div class="lineVal mono" id="sprOt">—</div>
+                                        </div>
+                                        <div class="lineItem" style="padding-top:6px;border-top:1px solid var(--border);">
+                                            <div class="lineLeft">Restantes</div>
+                                            <div class="lineVal mono" style="color:var(--warning)" id="sprRem">—</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="sectionLabel">Precisao das Estimativas</div>
+                                <div class="barRow" id="accuracyBars"></div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="cardHeader"><div class="cardTitle">Distribuicao por Projeto</div></div>
+                            <div class="cardBody">
+                                <div class="projWrap">
+                                    <div class="donut"><canvas id="chartProjects"></canvas></div>
+                                    <div class="projList" id="projectsList"></div>
+                                </div>
+                                <div class="help" id="projectsEmpty" style="display:none;margin-top:8px;">Sem dados por projeto no período.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid4">
+                    <div class="card">
+                        <div class="cardHeader">
+                            <div class="cardTitle">Mapa de Calor Semanal</div>
+                            <div class="legend" style="gap:8px;font-size:11px">
+                                <span>Menos</span>
+                                <span class="dot" style="background:var(--secondary);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 80%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 55%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 30%);border-radius:4px;width:12px;height:12px"></span>
+                                <span class="dot" style="background: var(--primary);border-radius:4px;width:12px;height:12px"></span>
+                                <span>Mais</span>
+                            </div>
+                        </div>
+                        <div class="cardBody">
+                            <div style="overflow:auto">
+                                <table class="heatTable">
+                                    <thead>
+                                    <tr>
+                                        <th style="text-align:left;width:64px"></th>
+                                        <th style="text-align:center">Seg</th>
+                                        <th style="text-align:center">Ter</th>
+                                        <th style="text-align:center">Qua</th>
+                                        <th style="text-align:center">Qui</th>
+                                        <th style="text-align:center">Sex</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="heatBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Performance da Equipe</div></div>
+                        <div class="cardBody">
+                            <div id="teamBox" style="display:flex;flex-direction:column;gap:14px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Distribuicao por Categoria</div></div>
+                        <div class="cardBody">
+                            <div style="height:220px"><canvas id="chartRadar"></canvas></div>
+                            <div class="help" id="radarEmpty" style="display:none;margin-top:8px;">Sem dados por categoria no período.</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="cardHeader"><div class="cardTitle">Atividade Recente</div></div>
+                        <div class="cardBody">
+                            <div class="activity" id="activity"></div>
+                            <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Filtros">
+    <div class="drawer">
+        <div class="drawerHeader">
+            <div class="drawerTitle">Filtros</div>
+            <button class="drawerClose" onclick="closeFilters()" title="Fechar"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="field">
+            <label>De</label>
+            <input class="input" id="f_from" type="date">
+        </div>
+        <div class="field">
+            <label>Ate</label>
+            <input class="input" id="f_to" type="date">
+        </div>
+        <div class="field">
+            <label>Timezone</label>
+            <input class="input" id="f_tz" placeholder="America/Sao_Paulo">
+        </div>
+        <div class="field">
+            <label>Filtro (JQL ou texto)</label>
+            <input class="input" id="f_q" placeholder='mps  |  project = MPS  |  labels = mps'>
+            <div class="help">Se for texto solto, o backend converte para <code>text ~ "…"</code>. Se for JQL, use <code>campo operador valor</code>.</div>
+        </div>
+        <div class="field">
+            <label>Modo</label>
+            <select class="select2" id="f_mode">
+                <option value="auto" selected>Auto</option>
+                <option value="jql">Forcar JQL</option>
+                <option value="text">Forcar texto</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Autor no JQL</label>
+            <select class="select2" id="f_author">
+                <option value="auto" selected>Auto</option>
+                <option value="on">Ligado</option>
+                <option value="off">Desligado</option>
+            </select>
+            <div class="help">Auto tenta <code>worklogAuthor</code> e, se falhar, desliga sozinho.</div>
+        </div>
+        <div class="field">
+            <label>Concorrencia</label>
+            <select class="select2" id="f_c">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+            </select>
+            <div class="help">Se der erro 429 (rate limit), reduza.</div>
+        </div>
+
+        <div class="btnRow">
+            <button class="btn primary" id="btnApply"><i data-lucide="refresh-cw"></i>Aplicar</button>
+            <button class="btn" id="btnCsv"><i data-lucide="download"></i>CSV</button>
+        </div>
+
+        <div class="help">API: <code>/api/hours</code></div>
+    </div>
+    <div style="flex:1" onclick="closeFilters()"></div>
+</div>
+
+<script>
+    // --- tolerant icons (CDN may be blocked)
+    function safeIcons(){ try { window.lucide?.createIcons?.(); } catch (e) {} }
+    safeIcons();
+
+    function showErr(msg){
+        const el = document.getElementById("err");
+        if (!msg){ el.style.display="none"; el.textContent=""; return; }
+        el.style.display="block"; el.textContent = msg;
+    }
+
+    const overlay = document.getElementById("overlay");
+    const sideOverlay = document.getElementById("sideOverlay");
+    function openFilters(){ overlay.style.display="flex"; }
+    function closeFilters(){ overlay.style.display="none"; }
+    function openSidebar(){ sideOverlay.style.display="flex"; }
+    function closeSidebar(){ sideOverlay.style.display="none"; }
+    window.closeFilters = closeFilters;
+    window.closeSidebar = closeSidebar;
+
+    document.getElementById("btnFilters").addEventListener("click", openFilters);
+    document.getElementById("btnMenu").addEventListener("click", openSidebar);
+
+    function ensureChart(){
+        if (!window.Chart){
+            showErr("Chart.js não carregou (CDN bloqueado/offline).");
+            return false;
+        }
+        return true;
+    }
+
+    // Defaults
+    function isoToday(){ return new Date().toISOString().slice(0,10); }
+    function isoMinusDays(d){ const x=new Date(); x.setDate(x.getDate()-d); return x.toISOString().slice(0,10); }
+    const f_from = document.getElementById("f_from");
+    const f_to = document.getElementById("f_to");
+    const f_tz = document.getElementById("f_tz");
+    const f_q = document.getElementById("f_q");
+    const f_mode = document.getElementById("f_mode");
+    const f_author = document.getElementById("f_author");
+    const f_c = document.getElementById("f_c");
+    f_from.value = isoMinusDays(30);
+    f_to.value = isoToday();
+    f_tz.value = "America/Sao_Paulo";
+
+    // Header selects: convenience mapping (optional)
+    const selSprint = document.getElementById("selSprint");
+    const selProject = document.getElementById("selProject");
+
+    function setSprintRange(v){
+        const today = isoToday();
+        const year = 2026;
+        function lastDay(y,m){ return new Date(Date.UTC(y,m,0)).toISOString().slice(0,10); } // m: 1..12
+        if (v==="sprint-13"){ f_from.value = `${year}-01-01`; f_to.value = lastDay(year,1); }
+        if (v==="sprint-14"){ f_from.value = `${year}-02-01`; f_to.value = lastDay(year,2); }
+        if (v==="sprint-15"){ f_from.value = `${year}-03-01`; f_to.value = today; }
+    }
+    selSprint.addEventListener("change", () => { setSprintRange(selSprint.value); openFilters(); });
+
+    selProject.addEventListener("change", () => {
+        if (selProject.value==="all"){ f_q.value=""; f_mode.value="auto"; }
+        else{
+            const label = selProject.options[selProject.selectedIndex].text;
+            // try JQL by project name; if it doesn't match your Jira, troque por project = KEY.
+            f_q.value = `project = "${label}"`;
+            f_mode.value = "jql";
+        }
+        openFilters();
+    });
+
+    // Charts
+    let chartDaily, chartMonthly, chartProjects, chartRadar;
+    function destroy(c){ if (c) c.destroy(); return null; }
+
+    const COLORS = [
+        getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-2").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-3").trim(),
+        getComputedStyle(document.documentElement).getPropertyValue("--chart-4").trim(),
+    ];
+
+    function fmtH(h){ return (Number(h)||0).toFixed(1) + "h"; }
+    function escapeHtml(s){ return String(s??"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c])); }
+
+    function badgeForStatus(status){
+        if (status==="done") return { cls:"success", label:"Concluido" };
+        if (status==="review") return { cls:"warning", label:"Em Revisao" };
+        if (status==="todo") return { cls:"", label:"A Fazer" };
+        return { cls:"primary", label:"Em Progresso" };
+    }
+    function badgeForPriority(p){
+        if (p==="high") return { cls:"chart5", label:"Alta" };
+        if (p==="low") return { cls:"", label:"Baixa" };
+        return { cls:"warning", label:"Media" };
+    }
+    function typeIcon(t){
+        if (t==="bug") return "bug";
+        if (t==="story") return "book-open";
+        if (t==="epic") return "layers";
+        return "wrench";
+    }
+
+    async function fetchDashboard(){
+        const params = new URLSearchParams({
+            from: f_from.value,
+            to: f_to.value,
+            tz: f_tz.value.trim(),
+            q: f_q.value.trim(),
+            mode: f_mode.value,
+            author: f_author.value,
+            c: f_c.value
+        });
+        const res = await fetch("/api/hours?" + params.toString());
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data?.error || "Falha ao buscar dados.");
+        return data;
+    }
+
+    function renderStats(d){
+        const total = d.totals.totalHours || 0;
+        const est = d.totals.estimatedHoursRange || 0;
+        const delta = total - est;
+
+        document.getElementById("stat_total").textContent = fmtH(total);
+        document.getElementById("stat_total_detail").textContent = `de ${fmtH(est)} estimadas`;
+        const trendEl = document.getElementById("stat_total_trend");
+        trendEl.textContent = delta >= 0 ? `+${fmtH(delta)} acima da estimativa` : `${fmtH(delta)} abaixo da estimativa`;
+        trendEl.className = "statTrend " + (delta>=0 ? "trendUp":"trendDown");
+
+        document.getElementById("stat_cards").textContent = String(d.counts.cardsWithHours || 0);
+        document.getElementById("stat_cards_detail").textContent = `de ${d.counts.issues || 0} issues encontradas`;
+        document.getElementById("stat_cards_trend").textContent = `${d.counts.daysWithHours || 0} dias com horas`;
+        document.getElementById("stat_cards_trend").className = "statTrend trendUp";
+
+        const avg = d.totals.avgDaily || 0;
+        document.getElementById("stat_avg").textContent = fmtH(avg);
+        document.getElementById("stat_avg_detail").textContent = "meta: 8h";
+        const avgDelta = avg - 8;
+        const avgTrend = document.getElementById("stat_avg_trend");
+        avgTrend.textContent = avgDelta >= 0 ? `+${fmtH(avgDelta)} da meta` : `${fmtH(avgDelta)} da meta`;
+        avgTrend.className = "statTrend " + (avgDelta>=0 ? "trendUp":"trendDown");
+
+        const streak = d.totals.streakAbove7h || 0;
+        document.getElementById("stat_streak").textContent = `${streak} dias`;
+        document.getElementById("stat_streak_detail").textContent = "acima de 7h/dia";
+        document.getElementById("stat_streak_trend").textContent = "streak no fim do período";
+        document.getElementById("stat_streak_trend").className = "statTrend trendUp";
+
+        // Avatar initials
+        const initials = (d.user?.displayName || "TT").split(/\s+/).map(s=>s[0]).slice(0,2).join("").toUpperCase();
+        document.getElementById("avatar").textContent = initials || "TT";
+    }
+
+    function renderDailyChart(d){
+        if (!ensureChart()) return;
+        const rows = d.dailyHoursChart || [];
+        const labels = rows.map(x => x.day);
+        const logged = rows.map(x => x.logged);
+        const estimated = rows.map(x => x.estimated);
+        document.getElementById("dailyEmpty").style.display = labels.length ? "none" : "block";
+        chartDaily = destroy(chartDaily);
+        if (!labels.length) return;
+
+        chartDaily = new Chart(document.getElementById("chartDaily"), {
+            data: {
+                labels,
+                datasets: [
+                    { type:"bar", label:"Registradas", data: logged, borderWidth:0, borderRadius:6, backgroundColor: COLORS[0] },
+                    { type:"line", label:"Estimadas", data: estimated, borderWidth:2, tension:0.25, pointRadius:0,
+                        borderColor: "rgba(255,255,255,.35)", borderDash:[4,4] }
+                ]
+            },
+            options:{
+                responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{display:false},
+                    tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}h` } } },
+                scales:{
+                    x:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{display:false}},
+                    y:{ beginAtZero:true, ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{color:"rgba(255,255,255,.08)"}}
+                }
+            }
+        });
+    }
+
+    function renderMonthlyChart(d){
+        if (!ensureChart()) return;
+        const rows = d.monthlyHours || [];
+        const labels = rows.map(x => x.month);
+        const logged = rows.map(x => x.logged);
+        const est = rows.map(x => x.estimated);
+        document.getElementById("monthlyEmpty").style.display = labels.length ? "none" : "block";
+        chartMonthly = destroy(chartMonthly);
+        if (!labels.length) return;
+
+        chartMonthly = new Chart(document.getElementById("chartMonthly"), {
+            type:"line",
+            data:{ labels, datasets:[
+                    { label:"Estimadas", data: est, borderWidth:2, tension:0.25, pointRadius:0, borderColor: COLORS[1] },
+                    { label:"Registradas", data: logged, borderWidth:2, tension:0.25, pointRadius:0, borderColor: COLORS[0] }
+                ]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+                scales:{ x:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{display:false}},
+                    y:{ ticks:{ color:"rgba(255,255,255,.65)", font:{size:11}}, grid:{color:"rgba(255,255,255,.08)"}} }
+            }
+        });
+    }
+
+    function renderCardsList(d){
+        const list = document.getElementById("cardsList");
+        const cards = d.cards || [];
+        document.getElementById("cardsCount").textContent = `${cards.length} cartoes`;
+        document.getElementById("cardsEmpty").style.display = cards.length ? "none" : "block";
+
+        list.innerHTML = cards.map(c => {
+            const status = badgeForStatus(c.status);
+            const pr = badgeForPriority(c.priority);
+            const progress = c.estimatedHours > 0 ? Math.min((c.loggedHours / c.estimatedHours) * 100, 100) : 0;
+            const over = c.estimatedHours > 0 && c.loggedHours > c.estimatedHours;
+
+            return `
+          <div class="jiraCard">
+            <div class="row">
+              <div style="margin-top:2px;color:var(--muted-foreground)"><i data-lucide="${typeIcon(c.type)}"></i></div>
+              <div class="grow">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                  <div class="grow" style="min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                      <span class="key mono">${escapeHtml(c.key)}</span>
+                      <span class="badge ${status.cls}">${status.label}</span>
+                      <span class="badge ${pr.cls}">${pr.label}</span>
+                    </div>
+                    <div class="title">${escapeHtml(c.title)}</div>
+                  </div>
+                  <div class="avatar" style="width:28px;height:28px;font-size:11px;margin-left:0">${escapeHtml(c.avatarInitials || "TT")}</div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+                  <div class="progress ${over ? "over" : ""}" style="flex:1;">
+                    <div style="width:${progress.toFixed(0)}%"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">
+                    <span class="mono" style="font-weight:800;color:${over ? "var(--chart-5)" : "var(--foreground)"}">${c.loggedHours.toFixed(1)}h</span>
+                    <span style="color:var(--muted-foreground)">/</span>
+                    <span class="mono" style="color:var(--muted-foreground)">${(c.estimatedHours||0).toFixed(1)}h</span>
+                  </div>
+                </div>
+
+                <div class="subline">
+                  <span>${escapeHtml(c.project || "—")}</span><span>·</span>
+                  <span>${escapeHtml(c.sprint || "—")}</span><span>·</span>
+                  <span style="text-transform:capitalize">${escapeHtml(c.type)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join("");
+
+        safeIcons();
+    }
+
+    function renderSprint(d){
+        const sp = d.sprintProgress || {};
+        const pct = sp.percentComplete || 0;
+        document.getElementById("ringPct").textContent = pct + "%";
+        const dash = pct * 2.64;
+        document.getElementById("ringProg").setAttribute("stroke-dasharray", `${dash} ${264 - dash}`);
+
+        document.getElementById("sprEst").textContent = fmtH(sp.estimateHours || 0);
+        document.getElementById("sprLog").textContent = fmtH(sp.loggedHours || 0);
+        document.getElementById("sprOt").textContent = fmtH(sp.overtimeHours || 0);
+        document.getElementById("sprRem").textContent = fmtH(sp.remainingHours || 0);
+
+        // Accuracy bars: heuristic from percentComplete
+        const within = Math.max(0, Math.min(100, 50 + (pct - 50) * 0.2));
+        const above = Math.max(0, Math.min(100, (sp.overtimeHours || 0) * 5));
+        const below = Math.max(0, 100 - within - above);
+
+        const rows = [
+            { label: "Dentro da estimativa", percentage: within, count: Math.round(within/10) },
+            { label: "Abaixo da estimativa", percentage: below, count: Math.round(below/10) },
+            { label: "Acima da estimativa", percentage: above, count: Math.round(above/10) },
+        ];
+
+        document.getElementById("accuracyBars").innerHTML = rows.map(r => `
+        <div class="barItem">
+          <div class="top"><span>${r.label}</span><span style="color:var(--muted-foreground)">${r.count} (${Math.round(r.percentage)}%)</span></div>
+          <div class="bar"><div style="width:${Math.round(r.percentage)}%"></div></div>
+        </div>
+      `).join("");
+    }
+
+    function renderProjects(d){
+        if (!ensureChart()) return;
+        const items = d.projectDistribution || [];
+        const labels = items.map(x => x.name);
+        const values = items.map(x => x.hours);
+        const empty = !labels.length;
+        document.getElementById("projectsEmpty").style.display = empty ? "block" : "none";
+        chartProjects = destroy(chartProjects);
+
+        if (!labels.length){
+            document.getElementById("projectsList").innerHTML = "";
+            return;
+        }
+
+        chartProjects = new Chart(document.getElementById("chartProjects"), {
+            type:"doughnut",
+            data:{ labels, datasets:[{ data: values, backgroundColor: items.map((_,i)=> COLORS[i%COLORS.length]), borderWidth:0, hoverOffset:6 }]},
+            options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{ legend:{display:false} } }
+        });
+
+        const list = document.getElementById("projectsList");
+        list.innerHTML = items.map((p, i) => `
+        <div class="projItem">
+          <div style="width:10px;height:10px;border-radius:999px;background:${COLORS[i % COLORS.length]}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="projNameRow">
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(p.name)}</span>
+              <span class="mono" style="color:var(--muted-foreground)">${p.hours.toFixed(1)}h</span>
+            </div>
+            <div class="projBar"><div style="width:${p.percentage}%;background:${COLORS[i % COLORS.length]}"></div></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function heatIntensity(hours){
+        if (hours === 0) return "var(--secondary)";
+        if (hours < 7) return "color-mix(in oklch, var(--primary), transparent 80%)";
+        if (hours <= 8) return "color-mix(in oklch, var(--primary), transparent 55%)";
+        if (hours <= 9) return "color-mix(in oklch, var(--primary), transparent 30%)";
+        return "var(--primary)";
+    }
+
+    function renderHeatmap(d){
+        const rows = d.weeklyHeatmap || [];
+        const tbody = document.getElementById("heatBody");
+        tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td style="color:var(--muted-foreground);padding-right:10px">${escapeHtml(r.week)}</td>
+          ${["seg","ter","qua","qui","sex"].map(k => {
+            const h = Number(r[k] || 0);
+            const bg = heatIntensity(h);
+            const txt = h > 0 ? `${h}h` : "-";
+            return `<td style="text-align:center"><div class="heatCell" title="${h}h" style="background:${bg}"><span class="mono" style="font-size:10px">${txt}</span></div></td>`;
+        }).join("")}
+        </tr>
+      `).join("");
+    }
+
+    function renderTeam(d){
+        const members = d.teamPerformance || [];
+        const box = document.getElementById("teamBox");
+        const max = Math.max(1, ...members.map(m => Number(m.totalHours || 0)));
+        box.innerHTML = members.map(m => {
+            const w = (Number(m.totalHours || 0) / max) * 100;
+            return `
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="avatar" style="margin-left:0">${escapeHtml(m.initials || "TT")}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px">
+                <span style="font-weight:600">${escapeHtml(m.name || "—")}</span>
+                <span class="mono" style="font-weight:800">${Number(m.totalHours || 0).toFixed(1)}h</span>
+              </div>
+              <div class="progress"><div style="width:${w.toFixed(0)}%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--muted-foreground)">
+                <span>${Number(m.cardsDone || 0)} cartoes</span>
+                <span>media ${Number(m.avgPerCard || 0).toFixed(1)}h/cartao</span>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join("");
+    }
+
+    function renderRadar(d){
+        if (!ensureChart()) return;
+        const items = d.categoryDistribution || [];
+        const labels = items.map(x => x.category);
+        const values = items.map(x => x.hours);
+        const empty = !labels.length;
+        document.getElementById("radarEmpty").style.display = empty ? "block" : "none";
+        chartRadar = destroy(chartRadar);
+        if (empty) return;
+
+        chartRadar = new Chart(document.getElementById("chartRadar"), {
+            type:"radar",
+            data:{ labels, datasets:[{ label:"Horas", data: values, borderWidth:2, borderColor: COLORS[0], backgroundColor:"rgba(0,0,0,0)" }]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
+                scales:{ r:{ angleLines:{color:"rgba(255,255,255,.08)"}, grid:{color:"rgba(255,255,255,.08)"}, pointLabels:{ color:"rgba(255,255,255,.65)", font:{size:11}}, ticks:{display:false} } }
+            }
+        });
+    }
+
+    function statusDotStyle(status){
+        if (status==="done") return "background: var(--success)";
+        if (status==="in_progress") return "background: var(--primary)";
+        if (status==="review") return "background: var(--warning)";
+        return "background: var(--muted-foreground)";
+    }
+
+    function renderActivity(d){
+        const items = d.recentActivity || [];
+        const box = document.getElementById("activity");
+        document.getElementById("activityEmpty").style.display = items.length ? "none" : "block";
+
+        box.innerHTML = items.map((a, idx) => `
+        <div class="actRow">
+          <div class="actLine">
+            <div class="actDot" style="${statusDotStyle(a.status)}"></div>
+            ${idx < items.length - 1 ? `<div class="actStick"></div>` : ``}
+          </div>
+          <div class="actBody">
+            <div class="actTitle">${escapeHtml(a.title)}</div>
+            <div class="actMeta">
+              <span class="mono" style="color:var(--primary)">${escapeHtml(a.key)}</span>
+              <span>${escapeHtml(a.assignee || "")}</span>
+              <span class="right">${escapeHtml(a.dateLabel || "")}</span>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function downloadCsv(series, from, to){
+        const header = ["date","hours","seconds"];
+        const lines = [header.join(",")].concat(
+            (series || []).map(x => [x.date, Number(x.hours||0).toFixed(2), Number(x.seconds||0)].join(","))
+        );
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `jira-hours-${from}_to_${to}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    let lastPayload = null;
+
+    async function load(){
+        const btnApply = document.getElementById("btnApply");
+        const btnCsv = document.getElementById("btnCsv");
+        const oldLabel = btnApply.innerHTML;
+        btnApply.disabled = true;
+        btnCsv.disabled = true;
+        btnApply.innerHTML = `<i data-lucide="loader-2"></i>Carregando...`;
+        safeIcons();
+
+        try{
+            const d = await fetchDashboard();
+            lastPayload = d;
+
+            renderStats(d);
+            renderDailyChart(d);
+            renderMonthlyChart(d);
+            renderCardsList(d);
+            renderSprint(d);
+            renderProjects(d);
+            renderHeatmap(d);
+            renderTeam(d);
+            renderRadar(d);
+            renderActivity(d);
+
+            showErr("");
+            closeFilters();
+        }catch(e){
+            showErr(String(e?.message || e));
+        }finally{
+            btnApply.disabled = false;
+            btnCsv.disabled = false;
+            btnApply.innerHTML = oldLabel;
+            safeIcons();
+        }
+    }
+
+    document.getElementById("btnApply").addEventListener("click", load);
+    document.getElementById("btnCsv").addEventListener("click", () => {
+        if (!lastPayload) return;
+        downloadCsv(lastPayload.series, lastPayload.query.from, lastPayload.query.to);
+    });
+
+    // Enter to apply
+    [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
+
+    load();
+</script>
+</body>
+</html>
