@@ -12,10 +12,9 @@ import { URL } from "node:url";
  *   GET /api/hours   -> JSON used by the dashboard
  *   GET /health      -> ok
  *
- * Required env:
- *   JIRA_BASE_URL=https://<site>.atlassian.net
- *   JIRA_EMAIL=<email>
- *   JIRA_API_TOKEN=<token>
+ * Credenciais Jira:
+ *   Enviadas pelo frontend em cada requisição via headers
+ *   x-jira-base-url, x-jira-email, x-jira-token
  *
  * Optional env:
  *   PORT=3000
@@ -26,9 +25,6 @@ import { URL } from "node:url";
  */
 
 const PORT = Number(process.env.PORT || "3002");
-const BASE_URL = String(process.env.JIRA_BASE_URL || "").replace(/\/+$/, "");
-const EMAIL = String(process.env.JIRA_EMAIL || "");
-const API_TOKEN = String(process.env.JIRA_API_TOKEN || "");
 
 const DEFAULT_TZ = String(process.env.DEFAULT_TZ || "America/Sao_Paulo");
 const DEFAULT_DAYS = Number(process.env.DEFAULT_DAYS || "30");
@@ -38,13 +34,7 @@ const FRONTEND_FILE = process.env.FRONTEND_FILE
     ? path.resolve(process.env.FRONTEND_FILE)
     : path.resolve(process.cwd(), "index.html");
 
-if (!BASE_URL || !EMAIL || !API_TOKEN) {
-    console.error("Missing env vars. Set JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN.");
-    process.exit(1);
-}
-
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
-const AUTH = `Basic ${b64(`${EMAIL}:${API_TOKEN}`)}`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clamp = (s, max = 4000) => String(s ?? "").trim().slice(0, max);
@@ -152,18 +142,32 @@ function mapStatus(fieldsStatus){
     return "in_progress";
 }
 
-async function jiraFetch(urlPath, { method="GET", headers={}, body } = {}) {
-    const url = `${BASE_URL}${urlPath}`;
+function authFromRequest(req) {
+    const baseUrl = String(req.headers["x-jira-base-url"] || "").trim().replace(/\/+$/, "");
+    const email = String(req.headers["x-jira-email"] || "").trim();
+    const token = String(req.headers["x-jira-token"] || "").trim();
+    if (!baseUrl || !email || !token) {
+        throw new Error("Credenciais ausentes. Informe base URL, e-mail e token.");
+    }
+    return {
+        baseUrl,
+        email,
+        auth: `Basic ${b64(`${email}:${token}`)}`,
+    };
+}
+
+async function jiraFetch(authConfig, urlPath, { method="GET", headers={}, body } = {}) {
+    const url = `${authConfig.baseUrl}${urlPath}`;
     const res = await fetch(url, {
         method,
-        headers: { Authorization: AUTH, Accept: "application/json", ...headers },
+        headers: { Authorization: authConfig.auth, Accept: "application/json", ...headers },
         body,
     });
 
     if (res.status === 429) {
         const retryAfter = safeNum(res.headers.get("retry-after"), 2);
         await sleep(Math.max(1, retryAfter) * 1000);
-        return jiraFetch(urlPath, { method, headers, body });
+        return jiraFetch(authConfig, urlPath, { method, headers, body });
     }
 
     const text = await res.text().catch(()=> "");
@@ -172,7 +176,7 @@ async function jiraFetch(urlPath, { method="GET", headers={}, body } = {}) {
     try { return JSON.parse(text || "{}"); } catch { return {}; }
 }
 
-async function searchIssuesByJql(jql) {
+async function searchIssuesByJql(authConfig, jql) {
     const issues = [];
     let nextPageToken = undefined;
 
@@ -184,7 +188,7 @@ async function searchIssuesByJql(jql) {
             ...(nextPageToken ? { nextPageToken } : {}),
         };
 
-        const page = await jiraFetch("/rest/api/3/search/jql", {
+        const page = await jiraFetch(authConfig, "/rest/api/3/search/jql", {
             method: "POST",
             headers: { "Content-Type":"application/json" },
             body: JSON.stringify(payload),
@@ -197,12 +201,12 @@ async function searchIssuesByJql(jql) {
     return issues;
 }
 
-async function fetchAllWorklogs(issueKey) {
+async function fetchAllWorklogs(authConfig, issueKey) {
     const all = [];
     let startAt=0;
     const maxResults=100;
     while (true) {
-        const page = await jiraFetch(`/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog?startAt=${startAt}&maxResults=${maxResults}`);
+        const page = await jiraFetch(authConfig, `/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog?startAt=${startAt}&maxResults=${maxResults}`);
         const worklogs = page.worklogs || [];
         all.push(...worklogs);
         startAt += worklogs.length;
@@ -250,18 +254,19 @@ function computeStreak(series, minHours=7){
     return streak;
 }
 
-async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency }) {
-    const cacheKey = JSON.stringify({ from, to, tz, q, mode, authorFilter, concurrency });
+async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter, concurrency, projectKey }) {
+    const cacheKey = JSON.stringify({ baseUrl: authConfig.baseUrl, email: authConfig.email, from, to, tz, q, mode, authorFilter, concurrency, projectKey });
     const cached = cacheGet(cacheKey);
     if (cached) return { ...cached, cached: true };
 
-    const me = await jiraFetch("/rest/api/3/myself");
+    const me = await jiraFetch(authConfig, "/rest/api/3/myself");
     const accountId = me?.accountId;
-    const displayName = me?.displayName || EMAIL;
+    const displayName = me?.displayName || authConfig.email;
     if (!accountId) throw new Error("Não consegui obter accountId em /rest/api/3/myself");
 
     const extra = normalizeExtraFilter(q, mode);
     let baseJql = `worklogDate >= "${from}" AND worklogDate <= "${to}"`;
+    if (projectKey && projectKey !== "all") baseJql = `${baseJql} AND project = "${escapeJqlString(projectKey)}"`;
     if (extra) baseJql = `${baseJql} AND (${extra})`;
 
     let jqlUsed = baseJql;
@@ -269,17 +274,17 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
     const af = String(authorFilter || "auto").toLowerCase();
     if (af === "on") {
         jqlUsed = `worklogAuthor = "${accountId}" AND ${baseJql}`;
-        issues = await searchIssuesByJql(jqlUsed);
+        issues = await searchIssuesByJql(authConfig, jqlUsed);
     } else if (af === "off") {
-        issues = await searchIssuesByJql(jqlUsed);
+        issues = await searchIssuesByJql(authConfig, jqlUsed);
     } else {
         try {
             jqlUsed = `worklogAuthor = "${accountId}" AND ${baseJql}`;
-            issues = await searchIssuesByJql(jqlUsed);
+            issues = await searchIssuesByJql(authConfig, jqlUsed);
         } catch (e) {
             if (!isLikelyWorklogAuthorJqlError(e?.message)) throw e;
             jqlUsed = baseJql;
-            issues = await searchIssuesByJql(jqlUsed);
+            issues = await searchIssuesByJql(authConfig, jqlUsed);
         }
     }
 
@@ -289,6 +294,8 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
     const byProjectSeconds = new Map();   // project -> seconds
     const byTypeSeconds = new Map();      // type -> seconds
     const recent = [];                   // worklog-level entries
+    const reviewedByDay = new Map(days.map(d => [d, 0]));
+    const dayDetails = new Map(days.map(d => [d, []]));
 
     const issueMeta = new Map(); // key -> meta used for cards
 
@@ -316,7 +323,7 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
             updatedAt: f.updated || "",
         });
 
-        const worklogs = await fetchAllWorklogs(key);
+        const worklogs = await fetchAllWorklogs(authConfig, key);
         for (const wl of worklogs) {
             if (wl?.author?.accountId !== accountId) continue;
 
@@ -334,16 +341,25 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
             const t = mapType(f.issuetype?.name);
             byTypeSeconds.set(t, (byTypeSeconds.get(t) || 0) + sec);
 
-            recent.push({
+            const issueStatus = mapStatus(f.status);
+            if (issueStatus === "review") {
+                reviewedByDay.set(day, (reviewedByDay.get(day) || 0) + 1);
+            }
+
+            const detail = {
                 started,
                 key,
                 title: summary,
                 seconds: sec,
                 hours: round2(sec / 3600),
-                status: mapStatus(f.status),
+                formatted: `${String(Math.floor(sec / 3600)).padStart(2, "0")}:${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}`,
+                status: issueStatus,
                 assignee: f.assignee?.displayName || displayName,
+                comment: String(wl.comment?.content?.[0]?.content?.[0]?.text || "").slice(0, 200),
                 updatedAt: f.updated || "",
-            });
+            };
+            dayDetails.get(day)?.push(detail);
+            recent.push(detail);
         }
     });
 
@@ -351,6 +367,24 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
         const seconds = byDaySeconds.get(d) || 0;
         return { date: d, seconds, hours: round2(seconds / 3600) };
     });
+
+    const reviewedCardsChart = days.map((date) => ({
+        date,
+        label: toDayLabelPtBR(date, tz),
+        reviewed: reviewedByDay.get(date) || 0,
+    }));
+
+    const dailyDetails = days.map((date) => {
+        const entries = (dayDetails.get(date) || []).sort((a,b) => new Date(a.started).getTime() - new Date(b.started).getTime());
+        const totalSeconds = entries.reduce((acc, it) => acc + safeNum(it.seconds, 0), 0);
+        return {
+            date,
+            totalSeconds,
+            totalHours: round2(totalSeconds / 3600),
+            formatted: `${String(Math.floor(totalSeconds / 3600)).padStart(2, "0")}:${String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0")}`,
+            entries,
+        };
+    }).filter((x) => x.entries.length > 0);
 
     const totalHours = round2(series.reduce((s, x) => s + x.hours, 0));
     const daysWithHours = series.filter(x => x.hours > 0).length;
@@ -520,10 +554,26 @@ async function buildDashboard({ from, to, tz, q, mode, authorFilter, concurrency
         categoryDistribution,
         recentActivity,
         teamPerformance,
+        reviewedCardsChart,
+        dailyDetails,
+        availableProjects: projectsArr.map((p) => ({ key: p.key, name: p.name })),
     };
 
     cacheSet(cacheKey, payload);
     return payload;
+}
+
+async function fetchProjects(authConfig) {
+    const me = await jiraFetch(authConfig, "/rest/api/3/myself");
+    const jql = `worklogAuthor = "${me.accountId}" ORDER BY updated DESC`;
+    const issues = await searchIssuesByJql(authConfig, jql);
+    const projects = new Map();
+    for (const issue of issues) {
+        const key = issue?.fields?.project?.key;
+        const name = issue?.fields?.project?.name || key;
+        if (key) projects.set(key, { key, name });
+    }
+    return Array.from(projects.values()).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
 function sendJson(res, status, obj) {
@@ -549,7 +599,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(204, {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET,OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Headers": "Content-Type,x-jira-base-url,x-jira-email,x-jira-token",
             });
             res.end();
             return;
@@ -557,6 +607,13 @@ const server = http.createServer(async (req, res) => {
 
         if (u.pathname === "/health") {
             sendJson(res, 200, { ok: true, time: new Date().toISOString() });
+            return;
+        }
+
+        if (u.pathname === "/api/projects") {
+            const authConfig = authFromRequest(req);
+            const projects = await fetchProjects(authConfig);
+            sendJson(res, 200, { ok: true, projects });
             return;
         }
 
@@ -568,6 +625,7 @@ const server = http.createServer(async (req, res) => {
             const tz = clamp(u.searchParams.get("tz") || DEFAULT_TZ, 80) || DEFAULT_TZ;
 
             const q = clamp(u.searchParams.get("q") || "", 2000);
+            const projectKey = clamp(u.searchParams.get("project") || "all", 40);
             const mode = clamp(u.searchParams.get("mode") || "auto", 10);
             const author = clamp(u.searchParams.get("author") || "auto", 10);
             const concurrency = Math.min(10, Math.max(1, Number(u.searchParams.get("c") || "5")));
@@ -581,7 +639,8 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
-            const payload = await buildDashboard({ from, to, tz, q, mode, authorFilter: author, concurrency });
+            const authConfig = authFromRequest(req);
+            const payload = await buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter: author, concurrency, projectKey });
             sendJson(res, 200, payload);
             return;
         }
