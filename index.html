@@ -45,10 +45,17 @@
         .mono{font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
 
         .app{display:flex;height:100vh;overflow:hidden}
+        .app[data-view="dashboard"] .report-only{display:none !important}
+        .app[data-view="reports"] .dashboard-only{display:none !important}
+        .app[data-view="reports"] .report-scroll{max-height:calc(100vh - 170px);overflow:auto;padding-right:6px}
+        .app[data-view="reports"] .content{overflow:hidden}
         .sidebar{
             width:256px;background:var(--card);border-right:1px solid var(--border);
-            padding:24px 12px;display:none;flex-direction:column;gap:4px;
+            padding:24px 12px;display:none;flex-direction:column;gap:4px;transition:.2s width;
         }
+        .sidebar.compact{width:80px}
+        .sidebar.compact .brandSub,.sidebar.compact .brandTitle,.sidebar.compact .navBtn span,.sidebar.compact .sidebarFooter{display:none}
+        .sidebar.hidden{width:0;padding:0;border-right:0;overflow:hidden}
         @media(min-width:1024px){.sidebar{display:flex}}
         .brand{display:flex;gap:12px;align-items:center;padding:0 12px;margin-bottom:28px}
         .brandIcon{
@@ -100,7 +107,7 @@
             color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-left:6px;
         }
 
-        .content{flex:1;overflow:auto;padding:16px}
+        .content{flex:1;overflow:hidden;padding:16px}
         @media(min-width:1024px){.content{padding:24px}}
         .titleBlock{margin-bottom:24px}
         .titleBlock h2{margin:0;font-size:20px;font-weight:700}
@@ -249,11 +256,15 @@
         .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
 
         code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
+        .customScroll{scrollbar-width:thin;scrollbar-color:color-mix(in oklch,var(--primary),transparent 30%) var(--secondary)}
+        .customScroll::-webkit-scrollbar{width:8px;height:8px}
+        .customScroll::-webkit-scrollbar-thumb{background:color-mix(in oklch,var(--primary),transparent 30%);border-radius:999px}
+        .customScroll::-webkit-scrollbar-track{background:var(--secondary);border-radius:999px}
     </style>
 </head>
 <body>
-<div class="app">
-    <aside class="sidebar">
+<div class="app" id="appRoot" data-view="dashboard">
+    <aside class="sidebar" id="sidebarDesktop">
         <div class="brand">
             <div class="brandIcon"><i data-lucide="clock"></i></div>
             <div>
@@ -263,9 +274,9 @@
         </div>
 
         <nav class="nav">
-            <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
-            <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
-            <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+            <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+            <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+            <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
                     </nav>
 
         <div class="sidebarFooter">
@@ -287,9 +298,9 @@
                 </div>
             </div>
             <nav class="nav">
-                <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
-                <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
-                <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
+                <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+                <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+                <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
             </nav>
             <div class="sidebarFooter">
                 <div class="sprintCard">
@@ -306,6 +317,9 @@
         <header class="header">
             <div class="hLeft">
                 <button class="iconBtn" id="btnMenu" title="Menu"><i data-lucide="menu"></i></button>
+                <button class="iconBtn" id="btnSideCompact" title="Retrair menu"><i data-lucide="panel-left"></i></button>
+                <button class="iconBtn" id="btnSideHide" title="Esconder menu"><i data-lucide="panel-left-close"></i></button>
+                <button class="iconBtn" id="btnSideShow" title="Expandir menu"><i data-lucide="panel-left-open"></i></button>
                 <div class="hSelects">
                     <button class="iconBtn" id="btnPrevMonth" title="Mes anterior"><i data-lucide="chevron-left"></i></button>
                     <div class="select" id="monthLabel" style="display:flex;align-items:center;min-width:140px;justify-content:center"></div>
@@ -333,7 +347,7 @@
             <div class="err" id="err"></div>
 
             <div style="display:flex;flex-direction:column;gap:24px;">
-                <section class="gridStats">
+                <section class="gridStats dashboard-only">
                     <div class="card">
                         <div class="cardBody" style="padding-top:18px">
                             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
@@ -391,7 +405,7 @@
                     </div>
                 </section>
 
-                <section class="grid2">
+                <section class="grid2 dashboard-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Horas por Dia</div>
@@ -421,7 +435,7 @@
                     </div>
                 </section>
 
-                <section class="grid3">
+                <div class="report-scroll customScroll report-only"><section class="grid3 report-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Horas por Cartao</div>
@@ -484,7 +498,7 @@
                     </div>
                 </section>
 
-                <section class="grid4">
+                <section class="grid4 report-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Mapa de Calor Semanal</div>
@@ -526,7 +540,7 @@
 
                     <div class="card">
                         <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
-                        <div class="cardBody" style="max-height:260px;overflow:auto" id="dailyDetails"></div>
+                        <div class="cardBody" style="max-height:260px;overflow:auto" id="dailyDetails" class="customScroll"></div>
                     </div>
                     </div>
 
@@ -537,7 +551,7 @@
                             <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
                         </div>
                     </div>
-                </section>
+                </section></div>
             </div>
         </main>
     </div>
@@ -640,6 +654,24 @@
 
     document.getElementById("btnFilters").addEventListener("click", openFilters);
     document.getElementById("btnMenu").addEventListener("click", openSidebar);
+    document.getElementById("btnSideCompact").addEventListener("click", ()=> applySidebarMode(sidebarDesktop.classList.contains("compact") ? "expanded" : "compact"));
+    document.getElementById("btnSideHide").addEventListener("click", ()=> applySidebarMode("hidden"));
+    document.getElementById("btnSideShow").addEventListener("click", ()=> applySidebarMode("expanded"));
+    document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.addEventListener('click', ()=> { setView(b.dataset.view); if (b.closest('#sideOverlay')) closeSidebar(); }));
+
+
+    const appRoot = document.getElementById("appRoot");
+    const sidebarDesktop = document.getElementById("sidebarDesktop");
+    function setView(view){
+        appRoot.dataset.view = view;
+        document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.classList.toggle('active', b.dataset.view===view));
+    }
+    function applySidebarMode(mode){
+        sidebarDesktop.classList.remove('compact','hidden');
+        if (mode==='compact') sidebarDesktop.classList.add('compact');
+        if (mode==='hidden') sidebarDesktop.classList.add('hidden');
+        localStorage.setItem('sidebarMode', mode);
+    }
 
     function ensureChart(){
         if (!window.Chart){
@@ -1156,7 +1188,7 @@
     // Enter to apply
     [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
 
-    (async () => { account = await getActive(); if (!account) { document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); return; } await loadProjects(); load(); })();
+    (async () => { setView("dashboard"); applySidebarMode(localStorage.getItem("sidebarMode") || "expanded"); account = await getActive(); if (!account) { document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); return; } await loadProjects(); load(); })();
 </script>
 </body>
 </html>
