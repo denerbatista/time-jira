@@ -114,19 +114,9 @@
         .titleBlock h2{margin:0;font-size:20px;font-weight:700}
         .titleBlock p{margin:6px 0 0 0;font-size:13px;color:var(--muted-foreground)}
 
-        .gridStats{display:grid;grid-template-columns:1fr;gap:16px}
-        @media(min-width:640px){.gridStats{grid-template-columns:repeat(2,1fr)}}
-        @media(min-width:1280px){.gridStats{grid-template-columns:repeat(4,1fr)}}
-
-        .grid2{display:grid;grid-template-columns:1fr;gap:24px}
-        @media(min-width:1280px){.grid2{grid-template-columns:repeat(2,1fr)}}
-
-        .grid3{display:grid;grid-template-columns:1fr;gap:24px}
-        @media(min-width:1280px){.grid3{grid-template-columns:2fr 1fr}}
-
-        .grid4{display:grid;grid-template-columns:1fr;gap:24px}
-        @media(min-width:768px){.grid4{grid-template-columns:repeat(2,1fr)}}
-        @media(min-width:1280px){.grid4{grid-template-columns:repeat(4,1fr)}}
+        .gridStats,.grid2,.grid3,.grid4{display:grid;grid-template-columns:repeat(12,minmax(0,1fr))}
+        .gridStats{gap:16px}
+        .grid2,.grid3,.grid4{gap:24px}
 
         .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative}
         .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between}
@@ -256,7 +246,7 @@
         .sideOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:60;align-items:stretch;justify-content:flex-start}
         .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
 
-        .app.layout-edit .card{outline:1px dashed color-mix(in oklch,var(--primary),transparent 45%);outline-offset:-1px}
+        .app.layout-edit .card{outline:1px dashed color-mix(in oklch,var(--primary),transparent 45%);outline-offset:-1px;cursor:grab}
         .app.layout-edit .card.dragging{opacity:.45}
         .app.layout-edit .card.drop-before{box-shadow:inset 0 4px 0 0 var(--primary)}
         .app.layout-edit .card.drop-after{box-shadow:inset 0 -4px 0 0 var(--primary)}
@@ -728,12 +718,44 @@
         localStorage.setItem('sidebarMode', mode);
     }
 
-    const LAYOUT_KEY = "dashboardCardLayoutV1";
+    const LAYOUT_KEY = "dashboardCardLayoutV2";
     let layoutEditMode = false;
     let draggingCard = null;
 
     function layoutCards(){
         return Array.from(document.querySelectorAll("main.content .card"));
+    }
+    function layoutParents(){
+        return Array.from(document.querySelectorAll("main.content [data-layout-parent-id]"));
+    }
+    function viewportWidth(){
+        return window.innerWidth || document.documentElement.clientWidth || 1280;
+    }
+    function defaultSpanForCard(card){
+        const parent = card.parentElement;
+        if (!parent) return 12;
+        const vw = viewportWidth();
+        const siblings = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
+        const index = Math.max(0, siblings.indexOf(card));
+
+        if (parent.classList.contains("gridStats")) {
+            if (vw < 640) return 12;
+            if (vw < 1280) return 6;
+            return 3;
+        }
+        if (parent.classList.contains("grid2")) {
+            return vw < 1280 ? 12 : 6;
+        }
+        if (parent.classList.contains("grid3")) {
+            if (vw < 1280) return 12;
+            return index === 0 ? 8 : 4;
+        }
+        if (parent.classList.contains("grid4")) {
+            if (vw < 768) return 12;
+            if (vw < 1280) return 6;
+            return 3;
+        }
+        return 12;
     }
     function ensureLayoutMeta(){
         const cards = layoutCards();
@@ -743,6 +765,9 @@
             if (!card.dataset.blockId) {
                 card.dataset.blockId = `block-${idx}`;
                 idx += 1;
+            }
+            if (!card.dataset.span) {
+                card.dataset.span = String(defaultSpanForCard(card));
             }
             if (!card.dataset.blockTitle) {
                 card.dataset.blockTitle = (
@@ -762,10 +787,12 @@
     function getMaxSpan(card){
         const parent = card.parentElement;
         if (!parent) return 1;
-        if (parent.classList.contains("gridStats")) return 4;
-        if (parent.classList.contains("grid2")) return 2;
-        if (parent.classList.contains("grid3")) return 2;
-        if (parent.classList.contains("grid4")) return 4;
+        if (
+            parent.classList.contains("gridStats")
+            || parent.classList.contains("grid2")
+            || parent.classList.contains("grid3")
+            || parent.classList.contains("grid4")
+        ) return 12;
         return 1;
     }
     function getCurrentGridColumns(parent){
@@ -777,14 +804,24 @@
     function getCardSpan(card){
         return Math.max(1, Number(card.dataset.span || "1") || 1);
     }
+    function minSpanForCard(card){
+        const parent = card.parentElement;
+        if (!parent) return 1;
+        const cols = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(parent)));
+        const containerWidth = parent.clientWidth || 0;
+        if (!containerWidth) return 1;
+        const minCardWidthPx = 220;
+        return Math.max(1, Math.min(cols, Math.ceil((minCardWidthPx * cols) / containerWidth)));
+    }
     function applyCardSpan(card, span){
         const max = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(card.parentElement)));
-        const safe = Math.max(1, Math.min(max, Number(span) || 1));
+        const min = minSpanForCard(card);
+        const safe = Math.max(min, Math.min(max, Number(span) || 1));
         card.dataset.span = String(safe);
         card.style.gridColumn = safe > 1 ? `span ${safe}` : "";
         const shrink = card.querySelector('[data-action="shrink"]');
         const grow = card.querySelector('[data-action="grow"]');
-        if (shrink) shrink.disabled = safe <= 1;
+        if (shrink) shrink.disabled = safe <= min;
         if (grow) grow.disabled = safe >= max;
     }
     function getCardHeight(card){
@@ -843,7 +880,7 @@
                 Array.from(parent.children).forEach((child) => {
                     if (!child.classList?.contains("card")) return;
                     setCardHidden(child, false);
-                    applyCardSpan(child, 1);
+                    applyCardSpan(child, defaultSpanForCard(child));
                     applyCardHeight(child, 0);
                 });
                 return;
@@ -925,6 +962,7 @@
             window.removeEventListener("pointerup", onUp);
             window.removeEventListener("pointercancel", onUp);
             card.classList.remove("resizing");
+            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
             saveLayoutState();
         };
 
@@ -956,17 +994,7 @@
         const removeBtn = tools.querySelector('[data-action="remove"]');
 
         tools.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-        moveBtn.addEventListener("pointerdown", (ev) => {
-            ev.stopPropagation();
-            if (!layoutEditMode) return;
-            card.draggable = true;
-        });
-        moveBtn.addEventListener("pointerup", () => {
-            if (!draggingCard) card.draggable = false;
-        });
-        moveBtn.addEventListener("pointerleave", () => {
-            if (!draggingCard) card.draggable = false;
-        });
+        moveBtn.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         resizeHandle.addEventListener("pointerdown", (ev) => startCardResize(card, ev));
 
         shrinkBtn.addEventListener("click", (ev) => {
@@ -987,7 +1015,7 @@
         });
 
         card.addEventListener("dragstart", (ev) => {
-            if (!layoutEditMode || card.dataset.hidden === "1" || !card.draggable) {
+            if (!layoutEditMode || card.dataset.hidden === "1") {
                 ev.preventDefault();
                 return;
             }
@@ -1000,13 +1028,11 @@
         });
         card.addEventListener("dragend", () => {
             draggingCard = null;
-            card.draggable = false;
             card.classList.remove("dragging");
             clearDropMarkers();
         });
         card.addEventListener("dragover", (ev) => {
             if (!layoutEditMode || !draggingCard || draggingCard === card) return;
-            if (draggingCard.parentElement !== card.parentElement) return;
             ev.preventDefault();
             const rect = card.getBoundingClientRect();
             const before = ev.clientY < rect.top + rect.height / 2;
@@ -1018,13 +1044,32 @@
         });
         card.addEventListener("drop", (ev) => {
             if (!layoutEditMode || !draggingCard || draggingCard === card) return;
-            if (draggingCard.parentElement !== card.parentElement) return;
             ev.preventDefault();
             const rect = card.getBoundingClientRect();
             const before = ev.clientY < rect.top + rect.height / 2;
             card.classList.remove("drop-before", "drop-after");
             card.parentElement.insertBefore(draggingCard, before ? card : card.nextSibling);
             saveLayoutState();
+        });
+    }
+    function attachParentDropTargets(){
+        layoutParents().forEach((parent) => {
+            if (parent.dataset.dropReady === "1") return;
+            parent.dataset.dropReady = "1";
+
+            parent.addEventListener("dragover", (ev) => {
+                if (!layoutEditMode || !draggingCard) return;
+                ev.preventDefault();
+            });
+            parent.addEventListener("drop", (ev) => {
+                if (!layoutEditMode || !draggingCard) return;
+                const targetCard = ev.target?.closest?.(".card");
+                if (targetCard) return;
+                ev.preventDefault();
+                parent.appendChild(draggingCard);
+                clearDropMarkers();
+                saveLayoutState();
+            });
         });
     }
     function syncLayoutMode(){
@@ -1036,7 +1081,7 @@
             clearDropMarkers();
         }
         layoutCards().forEach((card) => {
-            card.draggable = false;
+            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
         });
         refreshLayoutPicker();
     }
@@ -1047,6 +1092,7 @@
             applyCardSpan(card, getCardSpan(card));
             applyCardHeight(card, getCardHeight(card));
         });
+        attachParentDropTargets();
         applyLayoutState();
         syncLayoutMode();
         saveLayoutState();
