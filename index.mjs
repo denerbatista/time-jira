@@ -69,6 +69,9 @@ function dateKeyInTZ(dateTimeStr, tz) {
     const d = new Date(dateTimeStr);
     return d.toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
 }
+function todayKeyInTZ(tz) {
+    return new Date().toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+}
 function weekdayShort(dateStr, tz) {
     const d = new Date(`${dateStr}T12:00:00Z`);
     return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(d); // Mon, Tue...
@@ -389,7 +392,9 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const totalHours = round2(series.reduce((s, x) => s + x.hours, 0));
     const daysWithHours = series.filter(x => x.hours > 0).length;
     const avgDaily = series.length ? round2(totalHours / series.length) : 0;
-    const streakAbove7h = computeStreak(series, 7);
+    const todayTz = todayKeyInTZ(tz);
+    const completedDaysSeries = series.filter(x => x.date < todayTz);
+    const streakAbove7h = computeStreak(completedDaysSeries, 7);
 
     // Daily chart: last 14 business days
     const weekdays = series.filter(x => !["Sat","Sun"].includes(weekdayShort(x.date, tz)));
