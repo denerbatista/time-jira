@@ -77,8 +77,9 @@
         .navDeleteBtn{
             width:30px;height:30px;border-radius:10px;border:1px solid color-mix(in oklch,var(--destructive),transparent 65%);
             background:color-mix(in oklch,var(--destructive),transparent 88%);color:var(--destructive);
-            display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
+            display:none;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
         }
+        .app.layout-edit .navDeleteBtn{display:flex}
         .navDeleteBtn:disabled{opacity:.45;cursor:not-allowed}
         .navCreateBtn{
             border:1px dashed color-mix(in oklch, var(--primary), transparent 55%);
@@ -879,6 +880,7 @@
         container.addEventListener("click", (ev) => {
             const delBtn = ev.target.closest("[data-del-screen-id]");
             if (delBtn) {
+                if (!layoutEditMode) return;
                 ev.preventDefault();
                 ev.stopPropagation();
                 deleteScreen(delBtn.dataset.delScreenId);
