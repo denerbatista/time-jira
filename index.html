@@ -45,10 +45,17 @@
         .mono{font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
 
         .app{display:flex;height:100vh;overflow:hidden}
+        .app[data-view="dashboard"] .report-only{display:none !important}
+        .app[data-view="reports"] .dashboard-only{display:none !important}
+        .app[data-view="reports"] .report-scroll{max-height:calc(100vh - 170px);overflow:auto;padding-right:6px}
+        .app[data-view="reports"] .content{overflow:hidden}
         .sidebar{
             width:256px;background:var(--card);border-right:1px solid var(--border);
-            padding:24px 12px;display:none;flex-direction:column;gap:4px;
+            padding:24px 12px;display:none;flex-direction:column;gap:4px;transition:.2s width;
         }
+        .sidebar.compact{width:80px}
+        .sidebar.compact .brandSub,.sidebar.compact .brandTitle,.sidebar.compact .navBtn span,.sidebar.compact .sidebarFooter{display:none}
+        .sidebar.hidden{width:0;padding:0;border-right:0;overflow:hidden}
         @media(min-width:1024px){.sidebar{display:flex}}
         .brand{display:flex;gap:12px;align-items:center;padding:0 12px;margin-bottom:28px}
         .brandIcon{
@@ -100,7 +107,7 @@
             color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-left:6px;
         }
 
-        .content{flex:1;overflow:auto;padding:16px}
+        .content{flex:1;overflow:hidden;padding:16px}
         @media(min-width:1024px){.content{padding:24px}}
         .titleBlock{margin-bottom:24px}
         .titleBlock h2{margin:0;font-size:20px;font-weight:700}
@@ -249,11 +256,15 @@
         .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
 
         code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
+        .customScroll{scrollbar-width:thin;scrollbar-color:color-mix(in oklch,var(--primary),transparent 30%) var(--secondary)}
+        .customScroll::-webkit-scrollbar{width:8px;height:8px}
+        .customScroll::-webkit-scrollbar-thumb{background:color-mix(in oklch,var(--primary),transparent 30%);border-radius:999px}
+        .customScroll::-webkit-scrollbar-track{background:var(--secondary);border-radius:999px}
     </style>
 </head>
 <body>
-<div class="app">
-    <aside class="sidebar">
+<div class="app" id="appRoot" data-view="dashboard">
+    <aside class="sidebar" id="sidebarDesktop">
         <div class="brand">
             <div class="brandIcon"><i data-lucide="clock"></i></div>
             <div>
@@ -263,18 +274,15 @@
         </div>
 
         <nav class="nav">
-            <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
-            <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
-            <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
-            <button class="navBtn"><i data-lucide="users"></i>Equipe</button>
-            <button class="navBtn"><i data-lucide="calendar"></i>Sprints</button>
-            <button class="navBtn"><i data-lucide="trending-up"></i>Produtividade</button>
-        </nav>
+            <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+            <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+            <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
+                    </nav>
 
         <div class="sidebarFooter">
             <div class="sprintCard">
-                <div class="k">Sprint Atual</div>
-                <div class="v mono" id="sprintLabel">Sprint 14</div>
+                <div class="k">Progresso do Mes</div>
+                <div class="v mono" id="sprintLabel">Mes atual</div>
                 <div class="d" id="sprintHint">Período selecionado</div>
             </div>
         </div>
@@ -290,16 +298,13 @@
                 </div>
             </div>
             <nav class="nav">
-                <button class="navBtn active"><i data-lucide="layout-dashboard"></i>Visao Geral</button>
-                <button class="navBtn"><i data-lucide="clock"></i>Registro de Horas</button>
-                <button class="navBtn"><i data-lucide="bar-chart-3"></i>Relatorios</button>
-                <button class="navBtn"><i data-lucide="users"></i>Equipe</button>
-                <button class="navBtn"><i data-lucide="calendar"></i>Sprints</button>
-                <button class="navBtn"><i data-lucide="trending-up"></i>Produtividade</button>
+                <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+                <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+                <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
             </nav>
             <div class="sidebarFooter">
                 <div class="sprintCard">
-                    <div class="k">Sprint Atual</div>
+                    <div class="k">Progresso do Mes</div>
                     <div class="v mono">Sprint 14</div>
                     <div class="d">Período selecionado</div>
                 </div>
@@ -312,18 +317,15 @@
         <header class="header">
             <div class="hLeft">
                 <button class="iconBtn" id="btnMenu" title="Menu"><i data-lucide="menu"></i></button>
+                <button class="iconBtn" id="btnSideCompact" title="Retrair menu"><i data-lucide="panel-left"></i></button>
+                <button class="iconBtn" id="btnSideHide" title="Esconder menu"><i data-lucide="panel-left-close"></i></button>
+                <button class="iconBtn" id="btnSideShow" title="Expandir menu"><i data-lucide="panel-left-open"></i></button>
                 <div class="hSelects">
-                    <select class="select" id="selSprint">
-                        <option value="sprint-13">Sprint 13</option>
-                        <option value="sprint-14" selected>Sprint 14</option>
-                        <option value="sprint-15">Sprint 15</option>
-                    </select>
+                    <button class="iconBtn" id="btnPrevMonth" title="Mes anterior"><i data-lucide="chevron-left"></i></button>
+                    <div class="select" id="monthLabel" style="display:flex;align-items:center;min-width:140px;justify-content:center"></div>
+                    <button class="iconBtn" id="btnNextMonth" title="Proximo mes"><i data-lucide="chevron-right"></i></button>
                     <select class="select" id="selProject">
                         <option value="all" selected>Todos Projetos</option>
-                        <option value="portal">Portal Web</option>
-                        <option value="ecommerce">E-commerce</option>
-                        <option value="infra">Infraestrutura</option>
-                        <option value="mobile">Mobile App</option>
                     </select>
                 </div>
             </div>
@@ -339,13 +341,13 @@
         <main class="content">
             <div class="titleBlock">
                 <h2>Acompanhamento de Horas</h2>
-                <p id="subtitle">Sprint 14 - Fevereiro 2026</p>
+                <p id="subtitle">Periodo do mes atual</p>
             </div>
 
             <div class="err" id="err"></div>
 
             <div style="display:flex;flex-direction:column;gap:24px;">
-                <section class="gridStats">
+                <section class="gridStats dashboard-only">
                     <div class="card">
                         <div class="cardBody" style="padding-top:18px">
                             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
@@ -403,7 +405,7 @@
                     </div>
                 </section>
 
-                <section class="grid2">
+                <section class="grid2 dashboard-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Horas por Dia</div>
@@ -433,7 +435,7 @@
                     </div>
                 </section>
 
-                <section class="grid3">
+                <div class="report-scroll customScroll report-only"><section class="grid3 report-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Horas por Cartao</div>
@@ -447,7 +449,7 @@
 
                     <div style="display:flex;flex-direction:column;gap:24px;">
                         <div class="card">
-                            <div class="cardHeader"><div class="cardTitle">Progresso do Sprint</div></div>
+                            <div class="cardHeader"><div class="cardTitle">Progresso do Mes</div></div>
                             <div class="cardBody">
                                 <div class="sprintWrap">
                                     <div class="ring">
@@ -496,7 +498,7 @@
                     </div>
                 </section>
 
-                <section class="grid4">
+                <section class="grid4 report-only">
                     <div class="card">
                         <div class="cardHeader">
                             <div class="cardTitle">Mapa de Calor Semanal</div>
@@ -528,20 +530,18 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="card">
-                        <div class="cardHeader"><div class="cardTitle">Performance da Equipe</div></div>
+                        <div class="cardHeader"><div class="cardTitle">Cartoes Revisados</div></div>
                         <div class="cardBody">
-                            <div id="teamBox" style="display:flex;flex-direction:column;gap:14px;"></div>
+                            <div style="height:220px"><canvas id="chartReviewed"></canvas></div>
+                            <div class="help" id="reviewedEmpty" style="display:none;margin-top:8px;">Sem cartoes revisados no período.</div>
                         </div>
                     </div>
 
                     <div class="card">
-                        <div class="cardHeader"><div class="cardTitle">Distribuicao por Categoria</div></div>
-                        <div class="cardBody">
-                            <div style="height:220px"><canvas id="chartRadar"></canvas></div>
-                            <div class="help" id="radarEmpty" style="display:none;margin-top:8px;">Sem dados por categoria no período.</div>
-                        </div>
+                        <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
+                        <div class="cardBody" style="max-height:260px;overflow:auto" id="dailyDetails" class="customScroll"></div>
+                    </div>
                     </div>
 
                     <div class="card">
@@ -551,7 +551,7 @@
                             <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
                         </div>
                     </div>
-                </section>
+                </section></div>
             </div>
         </main>
     </div>
@@ -619,6 +619,19 @@
     <div style="flex:1" onclick="closeFilters()"></div>
 </div>
 
+<div class="overlay" id="authOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Autenticacao">
+    <div class="drawer" style="width:min(460px,92vw)">
+        <div class="drawerHeader"><div class="drawerTitle">Conectar Jira</div></div>
+        <div class="field"><label>Base URL</label><input class="input" id="auth_base" placeholder="https://empresa.atlassian.net"></div>
+        <div class="field"><label>Email</label><input class="input" id="auth_email" placeholder="email@empresa.com"></div>
+        <div class="field"><label>Token</label><input class="input" id="auth_token" placeholder="token"></div>
+        <div class="btnRow"><button class="btn primary" id="btnAuthSave">Salvar e entrar</button><button class="btn" id="btnLogout">Deslogar</button></div>
+        <div class="help">Usuarios salvos</div>
+        <div id="authUsers" style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow:auto"></div>
+    </div>
+    <div style="flex:1"></div>
+</div>
+
 <script>
     // --- tolerant icons (CDN may be blocked)
     function safeIcons(){ try { window.lucide?.createIcons?.(); } catch (e) {} }
@@ -641,6 +654,24 @@
 
     document.getElementById("btnFilters").addEventListener("click", openFilters);
     document.getElementById("btnMenu").addEventListener("click", openSidebar);
+    document.getElementById("btnSideCompact").addEventListener("click", ()=> applySidebarMode(sidebarDesktop.classList.contains("compact") ? "expanded" : "compact"));
+    document.getElementById("btnSideHide").addEventListener("click", ()=> applySidebarMode("hidden"));
+    document.getElementById("btnSideShow").addEventListener("click", ()=> applySidebarMode("expanded"));
+    document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.addEventListener('click', ()=> { setView(b.dataset.view); if (b.closest('#sideOverlay')) closeSidebar(); }));
+
+
+    const appRoot = document.getElementById("appRoot");
+    const sidebarDesktop = document.getElementById("sidebarDesktop");
+    function setView(view){
+        appRoot.dataset.view = view;
+        document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.classList.toggle('active', b.dataset.view===view));
+    }
+    function applySidebarMode(mode){
+        sidebarDesktop.classList.remove('compact','hidden');
+        if (mode==='compact') sidebarDesktop.classList.add('compact');
+        if (mode==='hidden') sidebarDesktop.classList.add('hidden');
+        localStorage.setItem('sidebarMode', mode);
+    }
 
     function ensureChart(){
         if (!window.Chart){
@@ -652,7 +683,9 @@
 
     // Defaults
     function isoToday(){ return new Date().toISOString().slice(0,10); }
-    function isoMinusDays(d){ const x=new Date(); x.setDate(x.getDate()-d); return x.toISOString().slice(0,10); }
+    function firstDayOfMonth(d){ return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0,10); }
+    function lastDayOfMonth(d){ return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)).toISOString().slice(0,10); }
+    function toHm(hours){ const m = Math.round((Number(hours)||0)*60); return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; }
     const f_from = document.getElementById("f_from");
     const f_to = document.getElementById("f_to");
     const f_tz = document.getElementById("f_tz");
@@ -660,37 +693,52 @@
     const f_mode = document.getElementById("f_mode");
     const f_author = document.getElementById("f_author");
     const f_c = document.getElementById("f_c");
-    f_from.value = isoMinusDays(30);
-    f_to.value = isoToday();
-    f_tz.value = "America/Sao_Paulo";
-
-    // Header selects: convenience mapping (optional)
-    const selSprint = document.getElementById("selSprint");
     const selProject = document.getElementById("selProject");
+    const monthLabel = document.getElementById("monthLabel");
+    const activeMonth = { d: new Date() };
 
-    function setSprintRange(v){
-        const today = isoToday();
-        const year = 2026;
-        function lastDay(y,m){ return new Date(Date.UTC(y,m,0)).toISOString().slice(0,10); } // m: 1..12
-        if (v==="sprint-13"){ f_from.value = `${year}-01-01`; f_to.value = lastDay(year,1); }
-        if (v==="sprint-14"){ f_from.value = `${year}-02-01`; f_to.value = lastDay(year,2); }
-        if (v==="sprint-15"){ f_from.value = `${year}-03-01`; f_to.value = today; }
+    const STORAGE_KEYS = { users: "jiraUsersEnc", active: "jiraActiveEnc" };
+    const APP_SECRET = "time-jira-local-v2";
+    const te = new TextEncoder(); const td = new TextDecoder();
+    function b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+    function ub64(s){ return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+    async function key(salt){ const base = await crypto.subtle.importKey("raw", te.encode(APP_SECRET + location.origin), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({name:"PBKDF2",salt:te.encode(salt),iterations:120000,hash:"SHA-256"}, base, {name:"AES-GCM",length:256}, false, ["encrypt","decrypt"]); }
+    async function enc(text,salt){ const iv=crypto.getRandomValues(new Uint8Array(12)); const k=await key(salt); const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k,te.encode(text)); return JSON.stringify({iv:b64(iv),ct:b64(ct)}); }
+    async function dec(payload,salt){ const o=JSON.parse(payload||"{}"); const k=await key(salt); const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(o.iv)},k,ub64(o.ct)); return td.decode(pt); }
+    async function getUsers(){ const raw=localStorage.getItem(STORAGE_KEYS.users); if(!raw) return []; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload,"users")); }catch{return [];} }
+    async function setUsers(users){ localStorage.setItem(STORAGE_KEYS.users, JSON.stringify({ payload: await enc(JSON.stringify(users), "users") })); }
+    async function getActive(){ const raw=localStorage.getItem(STORAGE_KEYS.active); if(!raw) return null; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload, e.salt||"active")); }catch{return null;} }
+    async function setActive(acc){ localStorage.setItem(STORAGE_KEYS.active, JSON.stringify({ salt:`${acc.baseUrl}|${acc.email}`, payload: await enc(JSON.stringify(acc), `${acc.baseUrl}|${acc.email}`) })); }
+    let account = null;
+
+    function syncMonthRange(){
+        const now = new Date();
+        const cur = activeMonth.d;
+        const same = cur.getUTCFullYear()===now.getUTCFullYear() && cur.getUTCMonth()===now.getUTCMonth();
+        f_from.value = firstDayOfMonth(cur);
+        f_to.value = same ? isoToday() : lastDayOfMonth(cur);
+        monthLabel.textContent = new Intl.DateTimeFormat("pt-BR", { month:"short", year:"numeric" }).format(cur);
+        document.getElementById("subtitle").textContent = `Periodo ${f_from.value} ate ${f_to.value}`;
+        document.getElementById("sprintLabel").textContent = monthLabel.textContent;
     }
-    selSprint.addEventListener("change", () => { setSprintRange(selSprint.value); openFilters(); });
 
-    selProject.addEventListener("change", () => {
-        if (selProject.value==="all"){ f_q.value=""; f_mode.value="auto"; }
-        else{
-            const label = selProject.options[selProject.selectedIndex].text;
-            // try JQL by project name; if it doesn't match your Jira, troque por project = KEY.
-            f_q.value = `project = "${label}"`;
-            f_mode.value = "jql";
-        }
-        openFilters();
-    });
+    document.getElementById("btnPrevMonth").addEventListener("click", ()=>{ activeMonth.d = new Date(Date.UTC(activeMonth.d.getUTCFullYear(), activeMonth.d.getUTCMonth()-1, 1)); syncMonthRange(); load(); });
+    document.getElementById("btnNextMonth").addEventListener("click", ()=>{ activeMonth.d = new Date(Date.UTC(activeMonth.d.getUTCFullYear(), activeMonth.d.getUTCMonth()+1, 1)); syncMonthRange(); load(); });
+
+    async function loadProjects(){
+        if (!account) return;
+        const r = await fetch('/api/projects', { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || 'Falha ao carregar projetos');
+        selProject.innerHTML = `<option value="all">Todos Projetos</option>` + (j.projects||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join('');
+    }
+    selProject.addEventListener("change", ()=> load());
+
+    f_tz.value = "America/Sao_Paulo";
+    syncMonthRange();
 
     // Charts
-    let chartDaily, chartMonthly, chartProjects, chartRadar;
+    let chartDaily, chartMonthly, chartProjects, chartReviewed;
     function destroy(c){ if (c) c.destroy(); return null; }
 
     const COLORS = [
@@ -700,7 +748,7 @@
         getComputedStyle(document.documentElement).getPropertyValue("--chart-4").trim(),
     ];
 
-    function fmtH(h){ return (Number(h)||0).toFixed(1) + "h"; }
+    function fmtH(h){ return toHm(h); }
     function escapeHtml(s){ return String(s??"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c])); }
 
     function badgeForStatus(status){
@@ -722,6 +770,7 @@
     }
 
     async function fetchDashboard(){
+        if (!account) throw new Error("Configure base URL, email e token.");
         const params = new URLSearchParams({
             from: f_from.value,
             to: f_to.value,
@@ -729,9 +778,10 @@
             q: f_q.value.trim(),
             mode: f_mode.value,
             author: f_author.value,
-            c: f_c.value
+            c: f_c.value,
+            project: selProject.value || 'all'
         });
-        const res = await fetch("/api/hours?" + params.toString());
+        const res = await fetch("/api/hours?" + params.toString(), { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data?.error || "Falha ao buscar dados.");
         return data;
@@ -995,22 +1045,20 @@
         }).join("");
     }
 
-    function renderRadar(d){
+    function renderReviewed(d){
         if (!ensureChart()) return;
-        const items = d.categoryDistribution || [];
-        const labels = items.map(x => x.category);
-        const values = items.map(x => x.hours);
+        const items = d.reviewedCardsChart || [];
+        const labels = items.map(x => x.label);
+        const values = items.map(x => x.reviewed);
         const empty = !labels.length;
-        document.getElementById("radarEmpty").style.display = empty ? "block" : "none";
-        chartRadar = destroy(chartRadar);
+        document.getElementById("reviewedEmpty").style.display = empty ? "block" : "none";
+        chartReviewed = destroy(chartReviewed);
         if (empty) return;
 
-        chartRadar = new Chart(document.getElementById("chartRadar"), {
-            type:"radar",
-            data:{ labels, datasets:[{ label:"Horas", data: values, borderWidth:2, borderColor: COLORS[0], backgroundColor:"rgba(0,0,0,0)" }]},
-            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-                scales:{ r:{ angleLines:{color:"rgba(255,255,255,.08)"}, grid:{color:"rgba(255,255,255,.08)"}, pointLabels:{ color:"rgba(255,255,255,.65)", font:{size:11}}, ticks:{display:false} } }
-            }
+        chartReviewed = new Chart(document.getElementById("chartReviewed"), {
+            type:"line",
+            data:{ labels, datasets:[{ label:"Revisados", data: values, borderWidth:2, borderColor: COLORS[1], backgroundColor:"rgba(0,0,0,0)" }]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} } }
         });
     }
 
@@ -1042,6 +1090,17 @@
           </div>
         </div>
       `).join("");
+    }
+
+
+    function renderDailyDetails(d){
+        const box = document.getElementById("dailyDetails");
+        const items = d.dailyDetails || [];
+        box.innerHTML = items.length ? items.map(day => `
+          <details style="margin-bottom:8px"><summary>${day.date} · ${day.formatted}</summary>
+            ${(day.entries||[]).map(e => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--border)"><div><div class="mono" style="color:var(--primary)">${escapeHtml(e.key)}</div><div>${escapeHtml(e.title)}</div></div><div class="mono">${escapeHtml(e.formatted)}</div></div>`).join("")}
+          </details>
+        `).join("") : '<div class="help">Sem detalhes no período.</div>';
     }
 
     function downloadCsv(series, from, to){
@@ -1082,8 +1141,8 @@
             renderSprint(d);
             renderProjects(d);
             renderHeatmap(d);
-            renderTeam(d);
-            renderRadar(d);
+            renderReviewed(d);
+            renderDailyDetails(d);
             renderActivity(d);
 
             showErr("");
@@ -1104,10 +1163,32 @@
         downloadCsv(lastPayload.series, lastPayload.query.from, lastPayload.query.to);
     });
 
+
+    async function refreshUsers(){
+        const users = await getUsers();
+        const box = document.getElementById("authUsers");
+        box.innerHTML = users.map((u,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--secondary);padding:8px;border-radius:10px"><span>${escapeHtml(u.email)}</span><div style="display:flex;gap:6px"><button class="btn" onclick="useUser(${i})">Usar</button><button class="btn" onclick="delUser(${i})">X</button></div></div>`).join("");
+    }
+    window.useUser = async (i)=>{ const users = await getUsers(); account = users[i]; if (!account) return; await setActive(account); document.getElementById("authOverlay").style.display="none"; await loadProjects(); load(); };
+    window.delUser = async (i)=>{ const users = await getUsers(); users.splice(i,1); await setUsers(users); await refreshUsers(); };
+
+    document.getElementById("avatar").addEventListener("click", async ()=>{ document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); });
+    document.getElementById("btnLogout").addEventListener("click", ()=>{ localStorage.removeItem(STORAGE_KEYS.active); account = null; document.getElementById("authOverlay").style.display="flex"; });
+    document.getElementById("btnAuthSave").addEventListener("click", async ()=>{
+        const acc = { baseUrl: document.getElementById("auth_base").value.trim(), email: document.getElementById("auth_email").value.trim(), token: document.getElementById("auth_token").value.trim() };
+        if (!acc.baseUrl || !acc.email || !acc.token) return;
+        const users = (await getUsers()).filter(u => !(u.baseUrl===acc.baseUrl && u.email===acc.email));
+        users.unshift(acc); await setUsers(users); await setActive(acc); account = acc;
+        document.getElementById("authOverlay").style.display="none";
+        await refreshUsers();
+        await loadProjects();
+        load();
+    });
+
     // Enter to apply
     [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
 
-    load();
+    (async () => { setView("dashboard"); applySidebarMode(localStorage.getItem("sidebarMode") || "expanded"); account = await getActive(); if (!account) { document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); return; } await loadProjects(); load(); })();
 </script>
 </body>
 </html>
