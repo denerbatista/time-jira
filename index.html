@@ -73,6 +73,11 @@
         }
         .navBtn:hover{background:var(--secondary);color:var(--foreground)}
         .navBtn.active{background:color-mix(in oklch, var(--primary), transparent 85%);color:var(--primary)}
+        .navCreateBtn{
+            border:1px dashed color-mix(in oklch, var(--primary), transparent 55%);
+            color:var(--primary);
+            margin-top:6px;
+        }
         .sidebarFooter{margin-top:auto;padding:0 12px}
         .sprintCard{background:var(--secondary);border-radius:12px;padding:14px}
         .sprintCard .k{font-size:12px;font-weight:700}
@@ -278,6 +283,12 @@
             display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;
             background:var(--secondary);border-radius:10px;font-size:12px;
         }
+        .screenIconGrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+        .screenIconBtn{
+            width:100%;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);
+            display:flex;align-items:center;justify-content:center;cursor:pointer;
+        }
+        .screenIconBtn.active{border-color:var(--primary);color:var(--primary);background:color-mix(in oklch,var(--primary),transparent 88%)}
 
         code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
         .customScroll{scrollbar-width:thin;scrollbar-color:color-mix(in oklch,var(--primary),transparent 30%) var(--secondary)}
@@ -297,11 +308,8 @@
             </div>
         </div>
 
-        <nav class="nav">
-            <button class="navBtn active" data-view="dashboard" data-nav="overview"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
-            <button class="navBtn" data-view="dashboard" data-nav="hours"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
-            <button class="navBtn" data-view="reports" data-nav="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
-                    </nav>
+        <nav class="nav" id="navDesktop"></nav>
+        <button class="navBtn navCreateBtn" id="btnNewScreenDesktop"><i data-lucide="plus"></i><span>Nova Tela</span></button>
 
         <div class="sidebarFooter">
             <div class="sprintCard">
@@ -321,11 +329,8 @@
                     <div class="brandSub">Jira Integration</div>
                 </div>
             </div>
-            <nav class="nav">
-                <button class="navBtn active" data-view="dashboard" data-nav="overview"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
-                <button class="navBtn" data-view="dashboard" data-nav="hours"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
-                <button class="navBtn" data-view="reports" data-nav="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
-            </nav>
+            <nav class="nav" id="navMobile"></nav>
+            <button class="navBtn navCreateBtn" id="btnNewScreenMobile"><i data-lucide="plus"></i><span>Nova Tela</span></button>
             <div class="sidebarFooter">
                 <div class="sprintCard">
                     <div class="k">Progresso do Mes</div>
@@ -588,6 +593,35 @@
     <div class="layoutPickerList customScroll" id="layoutPickerList"></div>
 </div>
 
+<div class="overlay" id="screenOverlay" role="dialog" aria-modal="true" aria-label="Nova tela">
+    <div class="drawer" style="width:min(460px,92vw)">
+        <div class="drawerHeader">
+            <div class="drawerTitle">Nova Tela</div>
+            <button class="drawerClose" id="btnCloseScreenOverlay" title="Fechar"><i data-lucide="x"></i></button>
+        </div>
+        <div class="field">
+            <label>Nome da tela</label>
+            <input class="input" id="screenName" placeholder="Ex.: Planejamento">
+        </div>
+        <div class="field">
+            <label>Tipo base</label>
+            <select class="select2" id="screenBaseView">
+                <option value="dashboard" selected>Dashboard</option>
+                <option value="reports">Relatorios</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Icone</label>
+            <div class="screenIconGrid customScroll" id="screenIconGrid"></div>
+        </div>
+        <div class="btnRow">
+            <button class="btn primary" id="btnCreateScreen"><i data-lucide="plus"></i>Criar Tela</button>
+            <button class="btn" id="btnCancelScreen">Cancelar</button>
+        </div>
+    </div>
+    <div style="flex:1" id="screenOverlayBackdrop"></div>
+</div>
+
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Filtros">
     <div class="drawer">
         <div class="drawerHeader">
@@ -678,38 +712,56 @@
     const sideOverlay = document.getElementById("sideOverlay");
     const layoutPicker = document.getElementById("layoutPicker");
     const layoutPickerList = document.getElementById("layoutPickerList");
+    const screenOverlay = document.getElementById("screenOverlay");
+    const btnCloseScreenOverlay = document.getElementById("btnCloseScreenOverlay");
+    const btnCancelScreen = document.getElementById("btnCancelScreen");
+    const btnCreateScreen = document.getElementById("btnCreateScreen");
+    const btnNewScreenDesktop = document.getElementById("btnNewScreenDesktop");
+    const btnNewScreenMobile = document.getElementById("btnNewScreenMobile");
+    const screenOverlayBackdrop = document.getElementById("screenOverlayBackdrop");
+    const screenName = document.getElementById("screenName");
+    const screenBaseView = document.getElementById("screenBaseView");
+    const screenIconGrid = document.getElementById("screenIconGrid");
+    const navDesktop = document.getElementById("navDesktop");
+    const navMobile = document.getElementById("navMobile");
     const btnLayoutEdit = document.getElementById("btnLayoutEdit");
     const btnAddBlock = document.getElementById("btnAddBlock");
     const appRoot = document.getElementById("appRoot");
     const sidebarDesktop = document.getElementById("sidebarDesktop");
+
+    const SCREEN_STORAGE_KEY = "dashboardScreensV1";
+    const ACTIVE_SCREEN_STORAGE_KEY = "activeScreenIdV1";
+    const SCREEN_ICON_OPTIONS = [
+        "layout-dashboard", "clock", "bar-chart-3", "kanban-square", "calendar-days",
+        "rocket", "flame", "target", "briefcase", "code-2", "bug", "wrench",
+        "layers", "book-open", "activity", "line-chart", "pie-chart", "notebook-pen",
+        "clipboard-list", "users", "settings", "star", "zap", "folder-kanban",
+    ];
+
+    let screens = [];
+    let currentScreenId = null;
+    let selectedScreenIcon = SCREEN_ICON_OPTIONS[0];
+
     function openFilters(){ overlay.style.display="flex"; }
     function closeFilters(){ overlay.style.display="none"; }
     function openSidebar(){ sideOverlay.style.display="flex"; }
     function closeSidebar(){ sideOverlay.style.display="none"; }
+    function openScreenDialog(){
+        screenName.value = "";
+        screenBaseView.value = "dashboard";
+        selectedScreenIcon = SCREEN_ICON_OPTIONS[0];
+        renderScreenIconPicker();
+        screenOverlay.style.display = "flex";
+        safeIcons();
+    }
+    function closeScreenDialog(){
+        screenOverlay.style.display = "none";
+    }
     window.closeFilters = closeFilters;
     window.closeSidebar = closeSidebar;
 
-    document.getElementById("btnFilters").addEventListener("click", openFilters);
-    document.getElementById("btnMenu").addEventListener("click", openSidebar);
-    document.getElementById("btnSideCompact").addEventListener("click", ()=> applySidebarMode(sidebarDesktop.classList.contains("compact") ? "expanded" : "compact"));
-    document.getElementById("btnSideHide").addEventListener("click", ()=> applySidebarMode("hidden"));
-    document.getElementById("btnSideShow").addEventListener("click", ()=> applySidebarMode("expanded"));
-    document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.addEventListener('click', ()=> {
-        setView(b.dataset.view);
-        setActiveNav(b.dataset.nav || "overview");
-        if (b.closest('#sideOverlay')) closeSidebar();
-    }));
-
-    function navToView(navKey){
-        return navKey === "reports" ? "reports" : "dashboard";
-    }
     function setView(view){
         appRoot.dataset.view = view;
-    }
-    function setActiveNav(navKey){
-        const safe = navKey || "overview";
-        localStorage.setItem("activeNav", safe);
-        document.querySelectorAll('.navBtn[data-nav]').forEach((b)=> b.classList.toggle("active", b.dataset.nav === safe));
     }
     function applySidebarMode(mode){
         sidebarDesktop.classList.remove('compact','hidden');
@@ -717,10 +769,114 @@
         if (mode==='hidden') sidebarDesktop.classList.add('hidden');
         localStorage.setItem('sidebarMode', mode);
     }
+    function defaultScreens(){
+        return [
+            { id: "screen-overview", name: "Visao Geral", icon: "layout-dashboard", view: "dashboard" },
+            { id: "screen-hours", name: "Registro de Horas", icon: "clock", view: "dashboard" },
+            { id: "screen-reports", name: "Relatorios", icon: "bar-chart-3", view: "reports" },
+        ];
+    }
+    function normalizeScreens(list){
+        if (!Array.isArray(list) || !list.length) return defaultScreens();
+        return list
+            .filter((s) => s && typeof s.id === "string")
+            .map((s, i) => ({
+                id: s.id || `screen-${i + 1}`,
+                name: String(s.name || `Tela ${i + 1}`).slice(0, 28),
+                icon: SCREEN_ICON_OPTIONS.includes(s.icon) ? s.icon : SCREEN_ICON_OPTIONS[0],
+                view: s.view === "reports" ? "reports" : "dashboard",
+            }));
+    }
+    function loadScreens(){
+        try {
+            const raw = localStorage.getItem(SCREEN_STORAGE_KEY);
+            screens = normalizeScreens(raw ? JSON.parse(raw) : defaultScreens());
+        } catch {
+            screens = defaultScreens();
+        }
+    }
+    function saveScreens(){
+        localStorage.setItem(SCREEN_STORAGE_KEY, JSON.stringify(screens));
+    }
+    function getScreenById(screenId){
+        return screens.find((s) => s.id === screenId) || null;
+    }
+    function renderScreenIconPicker(){
+        screenIconGrid.innerHTML = SCREEN_ICON_OPTIONS.map((icon) => `
+            <button class="screenIconBtn ${icon === selectedScreenIcon ? "active" : ""}" data-icon="${icon}" title="${icon}">
+                <i data-lucide="${icon}"></i>
+            </button>
+        `).join("");
+        screenIconGrid.querySelectorAll("[data-icon]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                selectedScreenIcon = btn.dataset.icon || SCREEN_ICON_OPTIONS[0];
+                renderScreenIconPicker();
+            });
+        });
+        safeIcons();
+    }
+    function renderScreensNav(){
+        const html = screens.map((s) => `
+            <button class="navBtn ${s.id === currentScreenId ? "active" : ""}" data-screen-id="${s.id}">
+                <i data-lucide="${s.icon}"></i><span>${escapeHtml(s.name)}</span>
+            </button>
+        `).join("");
+        navDesktop.innerHTML = html;
+        navMobile.innerHTML = html;
+        safeIcons();
+    }
+    function applyActiveScreen(screenId, { applyLayout = true } = {}){
+        const next = getScreenById(screenId) || screens[0];
+        if (!next) return;
+        if (currentScreenId && currentScreenId !== next.id) saveLayoutState();
+        currentScreenId = next.id;
+        localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, currentScreenId);
+        setView(next.view);
+        document.querySelectorAll(".navBtn[data-screen-id]").forEach((b) => b.classList.toggle("active", b.dataset.screenId === currentScreenId));
+        if (applyLayout) applyLayoutState();
+    }
+    function createScreenFromDialog(){
+        const name = (screenName.value || "").trim() || `Tela ${screens.length + 1}`;
+        const view = screenBaseView.value === "reports" ? "reports" : "dashboard";
+        const icon = SCREEN_ICON_OPTIONS.includes(selectedScreenIcon) ? selectedScreenIcon : SCREEN_ICON_OPTIONS[0];
+        const id = `screen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        screens.push({ id, name: name.slice(0, 28), icon, view });
+        saveScreens();
+        renderScreensNav();
+        applyActiveScreen(id, { applyLayout: true });
+        closeScreenDialog();
+    }
+    function bindNavClick(container, isMobile){
+        container.addEventListener("click", (ev) => {
+            const btn = ev.target.closest(".navBtn[data-screen-id]");
+            if (!btn) return;
+            applyActiveScreen(btn.dataset.screenId, { applyLayout: true });
+            if (isMobile) closeSidebar();
+        });
+    }
 
-    const LAYOUT_KEY = "dashboardCardLayoutV2";
+    bindNavClick(navDesktop, false);
+    bindNavClick(navMobile, true);
+
+    document.getElementById("btnFilters").addEventListener("click", openFilters);
+    document.getElementById("btnMenu").addEventListener("click", openSidebar);
+    document.getElementById("btnSideCompact").addEventListener("click", ()=> applySidebarMode(sidebarDesktop.classList.contains("compact") ? "expanded" : "compact"));
+    document.getElementById("btnSideHide").addEventListener("click", ()=> applySidebarMode("hidden"));
+    document.getElementById("btnSideShow").addEventListener("click", ()=> applySidebarMode("expanded"));
+    btnNewScreenDesktop.addEventListener("click", openScreenDialog);
+    btnNewScreenMobile.addEventListener("click", () => { closeSidebar(); openScreenDialog(); });
+    btnCloseScreenOverlay.addEventListener("click", closeScreenDialog);
+    btnCancelScreen.addEventListener("click", closeScreenDialog);
+    btnCreateScreen.addEventListener("click", createScreenFromDialog);
+    screenOverlayBackdrop.addEventListener("click", closeScreenDialog);
+    screenName.addEventListener("keydown", (ev) => { if (ev.key === "Enter") createScreenFromDialog(); });
+
+    const LAYOUT_KEY_PREFIX = "dashboardCardLayoutV2";
     let layoutEditMode = false;
     let draggingCard = null;
+    function currentLayoutKey(){
+        return `${LAYOUT_KEY_PREFIX}:${currentScreenId || "default"}`;
+    }
 
     function layoutCards(){
         return Array.from(document.querySelectorAll("main.content .card"));
@@ -865,12 +1021,12 @@
                 height: getCardHeight(card),
             }));
         });
-        localStorage.setItem(LAYOUT_KEY, JSON.stringify(state));
+        localStorage.setItem(currentLayoutKey(), JSON.stringify(state));
     }
     function applyLayoutState(){
         ensureLayoutMeta();
         let saved = {};
-        try { saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}"); } catch {}
+        try { saved = JSON.parse(localStorage.getItem(currentLayoutKey()) || "{}"); } catch {}
 
         const parents = Array.from(new Set(layoutCards().map((card) => card.parentElement).filter(Boolean)));
         parents.forEach((parent) => {
@@ -1632,10 +1788,12 @@
     [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
 
     (async () => {
+        loadScreens();
+        const savedScreenId = localStorage.getItem(ACTIVE_SCREEN_STORAGE_KEY);
+        currentScreenId = (getScreenById(savedScreenId) || screens[0] || {}).id || null;
+        renderScreensNav();
+        applyActiveScreen(currentScreenId, { applyLayout: false });
         setupLayoutEditor();
-        const savedNav = localStorage.getItem("activeNav") || "overview";
-        setActiveNav(savedNav);
-        setView(navToView(savedNav));
         applySidebarMode(localStorage.getItem("sidebarMode") || "expanded");
         account = await getActive();
         if (!account) {
