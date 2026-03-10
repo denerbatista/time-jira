@@ -248,9 +248,11 @@ function cacheGet(key){
 }
 function cacheSet(key, payload){ cache.set(key, { at: Date.now(), payload }); }
 
-function computeStreak(series, minHours=7){
+function computeStreak(series, minHours=7, tz=DEFAULT_TZ){
     let streak=0;
     for (let i=series.length-1;i>=0;i--){
+        const w = weekdayShort(series[i].date, tz);
+        if (w === "Sat" || w === "Sun") continue;
         if (series[i].hours >= minHours) streak += 1;
         else break;
     }
@@ -394,7 +396,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const avgDaily = series.length ? round2(totalHours / series.length) : 0;
     const todayTz = todayKeyInTZ(tz);
     const completedDaysSeries = series.filter(x => x.date < todayTz);
-    const streakAbove7h = computeStreak(completedDaysSeries, 7);
+    const streakAbove7h = computeStreak(completedDaysSeries, 7, tz);
 
     // Daily chart: last 14 business days
     const weekdays = series.filter(x => !["Sat","Sun"].includes(weekdayShort(x.date, tz)));
