@@ -91,6 +91,7 @@
             display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative;
         }
         .iconBtn:hover{background:var(--secondary);color:var(--foreground)}
+        .iconBtn.active{background:color-mix(in oklch, var(--primary), transparent 85%);color:var(--primary)}
         #btnMenu{display:flex}
         @media(min-width:1024px){#btnMenu{display:none}}
 
@@ -127,7 +128,7 @@
         @media(min-width:768px){.grid4{grid-template-columns:repeat(2,1fr)}}
         @media(min-width:1280px){.grid4{grid-template-columns:repeat(4,1fr)}}
 
-        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative}
         .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between}
         .cardTitle{font-size:13px;font-weight:650}
         .cardBody{padding:0 18px 18px 18px}
@@ -255,6 +256,32 @@
         .sideOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:60;align-items:stretch;justify-content:flex-start}
         .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
 
+        .app.layout-edit .card{outline:1px dashed color-mix(in oklch,var(--primary),transparent 45%);outline-offset:-1px}
+        .app.layout-edit .card.dragging{opacity:.45}
+        .app.layout-edit .card.drop-before{box-shadow:inset 0 4px 0 0 var(--primary)}
+        .app.layout-edit .card.drop-after{box-shadow:inset 0 -4px 0 0 var(--primary)}
+        .cardTools{position:absolute;top:10px;right:10px;display:none;align-items:center;gap:6px;z-index:5}
+        .app.layout-edit .cardTools{display:flex}
+        .cardToolBtn{
+            width:26px;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);
+            display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+        }
+        .cardToolBtn:disabled{opacity:.45;cursor:not-allowed}
+        .cardToolBtn[data-action="move"]{cursor:grab}
+
+        .layoutPicker{
+            position:fixed;top:72px;right:18px;width:min(320px,calc(100vw - 36px));z-index:70;display:none;
+            background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;
+            box-shadow:0 18px 30px rgba(0,0,0,.35);
+        }
+        .layoutPicker.open{display:block}
+        .layoutPickerTitle{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:8px}
+        .layoutPickerList{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto}
+        .layoutItem{
+            display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;
+            background:var(--secondary);border-radius:10px;font-size:12px;
+        }
+
         code{font-family:"JetBrains Mono", monospace;font-size:12px;color:color-mix(in oklch, var(--foreground), transparent 20%)}
         .customScroll{scrollbar-width:thin;scrollbar-color:color-mix(in oklch,var(--primary),transparent 30%) var(--secondary)}
         .customScroll::-webkit-scrollbar{width:8px;height:8px}
@@ -274,9 +301,9 @@
         </div>
 
         <nav class="nav">
-            <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
-            <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
-            <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
+            <button class="navBtn active" data-view="dashboard" data-nav="overview"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+            <button class="navBtn" data-view="dashboard" data-nav="hours"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+            <button class="navBtn" data-view="reports" data-nav="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
                     </nav>
 
         <div class="sidebarFooter">
@@ -298,9 +325,9 @@
                 </div>
             </div>
             <nav class="nav">
-                <button class="navBtn active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
-                <button class="navBtn" data-view="dashboard"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
-                <button class="navBtn" data-view="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
+                <button class="navBtn active" data-view="dashboard" data-nav="overview"><i data-lucide="layout-dashboard"></i><span>Visao Geral</span></button>
+                <button class="navBtn" data-view="dashboard" data-nav="hours"><i data-lucide="clock"></i><span>Registro de Horas</span></button>
+                <button class="navBtn" data-view="reports" data-nav="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
             </nav>
             <div class="sidebarFooter">
                 <div class="sprintCard">
@@ -330,6 +357,8 @@
                 </div>
             </div>
             <div class="hRight">
+                <button class="iconBtn" id="btnLayoutEdit" title="Editar blocos"><i data-lucide="pencil-ruler"></i></button>
+                <button class="iconBtn" id="btnAddBlock" title="Adicionar bloco" style="display:none"><i data-lucide="plus-square"></i></button>
                 <button class="iconBtn" id="btnFilters" title="Filtros"><i data-lucide="search"></i></button>
                 <button class="iconBtn" title="Notificacoes">
                     <i data-lucide="bell"></i><span class="notifDot"></span>
@@ -557,6 +586,11 @@
     </div>
 </div>
 
+<div class="layoutPicker" id="layoutPicker" role="dialog" aria-label="Blocos ocultos">
+    <div class="layoutPickerTitle">Blocos ocultos</div>
+    <div class="layoutPickerList customScroll" id="layoutPickerList"></div>
+</div>
+
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Filtros">
     <div class="drawer">
         <div class="drawerHeader">
@@ -645,6 +679,12 @@
 
     const overlay = document.getElementById("overlay");
     const sideOverlay = document.getElementById("sideOverlay");
+    const layoutPicker = document.getElementById("layoutPicker");
+    const layoutPickerList = document.getElementById("layoutPickerList");
+    const btnLayoutEdit = document.getElementById("btnLayoutEdit");
+    const btnAddBlock = document.getElementById("btnAddBlock");
+    const appRoot = document.getElementById("appRoot");
+    const sidebarDesktop = document.getElementById("sidebarDesktop");
     function openFilters(){ overlay.style.display="flex"; }
     function closeFilters(){ overlay.style.display="none"; }
     function openSidebar(){ sideOverlay.style.display="flex"; }
@@ -657,20 +697,280 @@
     document.getElementById("btnSideCompact").addEventListener("click", ()=> applySidebarMode(sidebarDesktop.classList.contains("compact") ? "expanded" : "compact"));
     document.getElementById("btnSideHide").addEventListener("click", ()=> applySidebarMode("hidden"));
     document.getElementById("btnSideShow").addEventListener("click", ()=> applySidebarMode("expanded"));
-    document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.addEventListener('click', ()=> { setView(b.dataset.view); if (b.closest('#sideOverlay')) closeSidebar(); }));
+    document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.addEventListener('click', ()=> {
+        setView(b.dataset.view);
+        setActiveNav(b.dataset.nav || "overview");
+        if (b.closest('#sideOverlay')) closeSidebar();
+    }));
 
-
-    const appRoot = document.getElementById("appRoot");
-    const sidebarDesktop = document.getElementById("sidebarDesktop");
+    function navToView(navKey){
+        return navKey === "reports" ? "reports" : "dashboard";
+    }
     function setView(view){
         appRoot.dataset.view = view;
-        document.querySelectorAll('.navBtn[data-view]').forEach((b)=> b.classList.toggle('active', b.dataset.view===view));
+    }
+    function setActiveNav(navKey){
+        const safe = navKey || "overview";
+        localStorage.setItem("activeNav", safe);
+        document.querySelectorAll('.navBtn[data-nav]').forEach((b)=> b.classList.toggle("active", b.dataset.nav === safe));
     }
     function applySidebarMode(mode){
         sidebarDesktop.classList.remove('compact','hidden');
         if (mode==='compact') sidebarDesktop.classList.add('compact');
         if (mode==='hidden') sidebarDesktop.classList.add('hidden');
         localStorage.setItem('sidebarMode', mode);
+    }
+
+    const LAYOUT_KEY = "dashboardCardLayoutV1";
+    let layoutEditMode = false;
+    let draggingCard = null;
+
+    function layoutCards(){
+        return Array.from(document.querySelectorAll("main.content .card"));
+    }
+    function ensureLayoutMeta(){
+        const cards = layoutCards();
+        let idx = 1;
+        const parents = [];
+        cards.forEach((card) => {
+            if (!card.dataset.blockId) {
+                card.dataset.blockId = `block-${idx}`;
+                idx += 1;
+            }
+            if (!card.dataset.blockTitle) {
+                card.dataset.blockTitle = (
+                    card.querySelector(".cardTitle")?.textContent
+                    || card.querySelector(".statLabel")?.textContent
+                    || "Bloco"
+                ).trim();
+            }
+            if (card.parentElement && !parents.includes(card.parentElement)) {
+                parents.push(card.parentElement);
+            }
+        });
+        parents.forEach((parent, index) => {
+            parent.dataset.layoutParentId = `layout-parent-${index + 1}`;
+        });
+    }
+    function getMaxSpan(card){
+        const parent = card.parentElement;
+        if (!parent) return 1;
+        if (parent.classList.contains("gridStats")) return 4;
+        if (parent.classList.contains("grid2")) return 2;
+        if (parent.classList.contains("grid3")) return 2;
+        if (parent.classList.contains("grid4")) return 4;
+        return 1;
+    }
+    function getCardSpan(card){
+        return Math.max(1, Number(card.dataset.span || "1") || 1);
+    }
+    function applyCardSpan(card, span){
+        const max = getMaxSpan(card);
+        const safe = Math.max(1, Math.min(max, Number(span) || 1));
+        card.dataset.span = String(safe);
+        card.style.gridColumn = safe > 1 ? `span ${safe}` : "";
+        const shrink = card.querySelector('[data-action="shrink"]');
+        const grow = card.querySelector('[data-action="grow"]');
+        if (shrink) shrink.disabled = safe <= 1;
+        if (grow) grow.disabled = safe >= max;
+    }
+    function setCardHidden(card, hidden){
+        card.dataset.hidden = hidden ? "1" : "0";
+        card.style.display = hidden ? "none" : "";
+        if (!hidden) applyCardSpan(card, getCardSpan(card));
+    }
+    function hiddenCards(){
+        return layoutCards().filter((card) => card.dataset.hidden === "1");
+    }
+    function clearDropMarkers(){
+        layoutCards().forEach((card) => card.classList.remove("drop-before", "drop-after"));
+    }
+    function saveLayoutState(){
+        const state = {};
+        const parents = Array.from(new Set(layoutCards().map((card) => card.parentElement).filter(Boolean)));
+        parents.forEach((parent) => {
+            const parentId = parent.dataset.layoutParentId;
+            const cards = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
+            state[parentId] = cards.map((card) => ({
+                id: card.dataset.blockId,
+                hidden: card.dataset.hidden === "1",
+                span: getCardSpan(card),
+            }));
+        });
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(state));
+    }
+    function applyLayoutState(){
+        ensureLayoutMeta();
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}"); } catch {}
+
+        const parents = Array.from(new Set(layoutCards().map((card) => card.parentElement).filter(Boolean)));
+        parents.forEach((parent) => {
+            const parentId = parent.dataset.layoutParentId;
+            const rows = Array.isArray(saved[parentId]) ? saved[parentId] : [];
+            if (!rows.length) {
+                Array.from(parent.children).forEach((child) => {
+                    if (!child.classList?.contains("card")) return;
+                    setCardHidden(child, false);
+                    applyCardSpan(child, 1);
+                });
+                return;
+            }
+            const pos = new Map(rows.map((row, index) => [row.id, index]));
+            const cards = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
+            cards.sort((a, b) => {
+                const ai = pos.has(a.dataset.blockId) ? pos.get(a.dataset.blockId) : Number.MAX_SAFE_INTEGER;
+                const bi = pos.has(b.dataset.blockId) ? pos.get(b.dataset.blockId) : Number.MAX_SAFE_INTEGER;
+                return ai - bi;
+            }).forEach((card) => parent.appendChild(card));
+
+            rows.forEach((row) => {
+                const card = parent.querySelector(`.card[data-block-id="${row.id}"]`);
+                if (!card) return;
+                setCardHidden(card, !!row.hidden);
+                applyCardSpan(card, row.span || 1);
+            });
+        });
+    }
+    function refreshLayoutPicker(){
+        const hidden = hiddenCards();
+        if (!hidden.length) {
+            layoutPickerList.innerHTML = '<div class="help">Nenhum bloco oculto.</div>';
+            return;
+        }
+        layoutPickerList.innerHTML = hidden.map((card) => `
+            <div class="layoutItem">
+                <span>${escapeHtml(card.dataset.blockTitle || "Bloco")}</span>
+                <button class="cardToolBtn" data-restore="${card.dataset.blockId}" title="Adicionar bloco">
+                    <i data-lucide="plus"></i>
+                </button>
+            </div>
+        `).join("");
+        layoutPickerList.querySelectorAll("[data-restore]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const card = document.querySelector(`.card[data-block-id="${btn.dataset.restore}"]`);
+                if (!card) return;
+                setCardHidden(card, false);
+                saveLayoutState();
+                refreshLayoutPicker();
+            });
+        });
+        safeIcons();
+    }
+    function attachCardTools(card){
+        if (card.querySelector(".cardTools")) return;
+        const tools = document.createElement("div");
+        tools.className = "cardTools";
+        tools.innerHTML = `
+            <button class="cardToolBtn" data-action="move" title="Arrastar bloco"><i data-lucide="grip-vertical"></i></button>
+            <button class="cardToolBtn" data-action="shrink" title="Diminuir bloco"><i data-lucide="minus"></i></button>
+            <button class="cardToolBtn" data-action="grow" title="Aumentar bloco"><i data-lucide="plus"></i></button>
+            <button class="cardToolBtn" data-action="remove" title="Remover bloco"><i data-lucide="trash-2"></i></button>
+        `;
+        card.appendChild(tools);
+
+        const moveBtn = tools.querySelector('[data-action="move"]');
+        const shrinkBtn = tools.querySelector('[data-action="shrink"]');
+        const growBtn = tools.querySelector('[data-action="grow"]');
+        const removeBtn = tools.querySelector('[data-action="remove"]');
+
+        tools.addEventListener("mousedown", (ev) => ev.stopPropagation());
+        moveBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+
+        shrinkBtn.addEventListener("click", (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            applyCardSpan(card, getCardSpan(card) - 1);
+            saveLayoutState();
+        });
+        growBtn.addEventListener("click", (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            applyCardSpan(card, getCardSpan(card) + 1);
+            saveLayoutState();
+        });
+        removeBtn.addEventListener("click", (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            setCardHidden(card, true);
+            saveLayoutState();
+            refreshLayoutPicker();
+        });
+
+        card.addEventListener("dragstart", (ev) => {
+            if (!layoutEditMode || card.dataset.hidden === "1") {
+                ev.preventDefault();
+                return;
+            }
+            draggingCard = card;
+            card.classList.add("dragging");
+            if (ev.dataTransfer) {
+                ev.dataTransfer.effectAllowed = "move";
+                ev.dataTransfer.setData("text/plain", card.dataset.blockId || "");
+            }
+        });
+        card.addEventListener("dragend", () => {
+            draggingCard = null;
+            card.classList.remove("dragging");
+            clearDropMarkers();
+        });
+        card.addEventListener("dragover", (ev) => {
+            if (!layoutEditMode || !draggingCard || draggingCard === card) return;
+            if (draggingCard.parentElement !== card.parentElement) return;
+            ev.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const before = ev.clientY < rect.top + rect.height / 2;
+            card.classList.toggle("drop-before", before);
+            card.classList.toggle("drop-after", !before);
+        });
+        card.addEventListener("dragleave", () => {
+            card.classList.remove("drop-before", "drop-after");
+        });
+        card.addEventListener("drop", (ev) => {
+            if (!layoutEditMode || !draggingCard || draggingCard === card) return;
+            if (draggingCard.parentElement !== card.parentElement) return;
+            ev.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const before = ev.clientY < rect.top + rect.height / 2;
+            card.classList.remove("drop-before", "drop-after");
+            card.parentElement.insertBefore(draggingCard, before ? card : card.nextSibling);
+            saveLayoutState();
+        });
+    }
+    function syncLayoutMode(){
+        appRoot.classList.toggle("layout-edit", layoutEditMode);
+        btnLayoutEdit.classList.toggle("active", layoutEditMode);
+        btnAddBlock.style.display = layoutEditMode ? "flex" : "none";
+        if (!layoutEditMode) {
+            layoutPicker.classList.remove("open");
+            clearDropMarkers();
+        }
+        layoutCards().forEach((card) => {
+            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
+        });
+        refreshLayoutPicker();
+    }
+    function setupLayoutEditor(){
+        ensureLayoutMeta();
+        layoutCards().forEach((card) => {
+            attachCardTools(card);
+            applyCardSpan(card, getCardSpan(card));
+        });
+        applyLayoutState();
+        syncLayoutMode();
+        saveLayoutState();
+        btnLayoutEdit.addEventListener("click", () => {
+            layoutEditMode = !layoutEditMode;
+            syncLayoutMode();
+        });
+        btnAddBlock.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            layoutPicker.classList.toggle("open");
+            refreshLayoutPicker();
+        });
+        document.addEventListener("click", (ev) => {
+            if (!layoutPicker.classList.contains("open")) return;
+            if (layoutPicker.contains(ev.target) || btnAddBlock.contains(ev.target)) return;
+            layoutPicker.classList.remove("open");
+        });
+        safeIcons();
     }
 
     function ensureChart(){
@@ -1188,7 +1488,21 @@
     // Enter to apply
     [f_from, f_to, f_tz, f_q].forEach(el => el.addEventListener("keydown", ev => { if (ev.key === "Enter") load(); }));
 
-    (async () => { setView("dashboard"); applySidebarMode(localStorage.getItem("sidebarMode") || "expanded"); account = await getActive(); if (!account) { document.getElementById("authOverlay").style.display="flex"; await refreshUsers(); return; } await loadProjects(); load(); })();
+    (async () => {
+        setupLayoutEditor();
+        const savedNav = localStorage.getItem("activeNav") || "overview";
+        setActiveNav(savedNav);
+        setView(navToView(savedNav));
+        applySidebarMode(localStorage.getItem("sidebarMode") || "expanded");
+        account = await getActive();
+        if (!account) {
+            document.getElementById("authOverlay").style.display="flex";
+            await refreshUsers();
+            return;
+        }
+        await loadProjects();
+        load();
+    })();
 </script>
 </body>
 </html>
