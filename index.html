@@ -268,6 +268,13 @@
         }
         .cardToolBtn:disabled{opacity:.45;cursor:not-allowed}
         .cardToolBtn[data-action="move"]{cursor:grab}
+        .cardResizeHandle{
+            position:absolute;right:8px;bottom:8px;width:22px;height:22px;border-radius:8px;border:1px solid var(--border);
+            background:color-mix(in oklch, var(--secondary), transparent 15%);color:var(--foreground);display:none;
+            align-items:center;justify-content:center;cursor:nwse-resize;z-index:6;padding:0;
+        }
+        .app.layout-edit .cardResizeHandle{display:flex}
+        .app.layout-edit .card.resizing{box-shadow:0 0 0 1px var(--primary), 0 0 0 4px color-mix(in oklch, var(--primary), transparent 85%)}
 
         .layoutPicker{
             position:fixed;top:72px;right:18px;width:min(320px,calc(100vw - 36px));z-index:70;display:none;
@@ -761,11 +768,17 @@
         if (parent.classList.contains("grid4")) return 4;
         return 1;
     }
+    function getCurrentGridColumns(parent){
+        if (!parent) return 1;
+        const raw = getComputedStyle(parent).gridTemplateColumns;
+        if (!raw || raw === "none") return 1;
+        return Math.max(1, raw.split(" ").filter(Boolean).length);
+    }
     function getCardSpan(card){
         return Math.max(1, Number(card.dataset.span || "1") || 1);
     }
     function applyCardSpan(card, span){
-        const max = getMaxSpan(card);
+        const max = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(card.parentElement)));
         const safe = Math.max(1, Math.min(max, Number(span) || 1));
         card.dataset.span = String(safe);
         card.style.gridColumn = safe > 1 ? `span ${safe}` : "";
@@ -774,10 +787,27 @@
         if (shrink) shrink.disabled = safe <= 1;
         if (grow) grow.disabled = safe >= max;
     }
+    function getCardHeight(card){
+        return Math.max(0, Number(card.dataset.height || "0") || 0);
+    }
+    function applyCardHeight(card, px){
+        const raw = Math.round(Number(px) || 0);
+        if (raw <= 0) {
+            delete card.dataset.height;
+            card.style.minHeight = "";
+            return;
+        }
+        const safe = Math.max(140, raw);
+        card.dataset.height = String(safe);
+        card.style.minHeight = `${safe}px`;
+    }
     function setCardHidden(card, hidden){
         card.dataset.hidden = hidden ? "1" : "0";
         card.style.display = hidden ? "none" : "";
-        if (!hidden) applyCardSpan(card, getCardSpan(card));
+        if (!hidden) {
+            applyCardSpan(card, getCardSpan(card));
+            applyCardHeight(card, getCardHeight(card));
+        }
     }
     function hiddenCards(){
         return layoutCards().filter((card) => card.dataset.hidden === "1");
@@ -795,6 +825,7 @@
                 id: card.dataset.blockId,
                 hidden: card.dataset.hidden === "1",
                 span: getCardSpan(card),
+                height: getCardHeight(card),
             }));
         });
         localStorage.setItem(LAYOUT_KEY, JSON.stringify(state));
@@ -813,6 +844,7 @@
                     if (!child.classList?.contains("card")) return;
                     setCardHidden(child, false);
                     applyCardSpan(child, 1);
+                    applyCardHeight(child, 0);
                 });
                 return;
             }
@@ -829,6 +861,7 @@
                 if (!card) return;
                 setCardHidden(card, !!row.hidden);
                 applyCardSpan(card, row.span || 1);
+                applyCardHeight(card, row.height || 0);
             });
         });
     }
@@ -857,6 +890,48 @@
         });
         safeIcons();
     }
+    function startCardResize(card, startEvent){
+        if (!layoutEditMode || card.dataset.hidden === "1") return;
+        startEvent.preventDefault();
+        startEvent.stopPropagation();
+        card.draggable = false;
+
+        const parent = card.parentElement;
+        if (!parent) return;
+
+        const parentStyles = getComputedStyle(parent);
+        const gap = Number.parseFloat(parentStyles.columnGap || parentStyles.gap || "0") || 0;
+        const columns = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(parent)));
+        const parentWidth = parent.clientWidth || card.getBoundingClientRect().width;
+        const columnWidth = columns > 0 ? (parentWidth - gap * (columns - 1)) / columns : parentWidth;
+
+        const startX = startEvent.clientX;
+        const startY = startEvent.clientY;
+        const rect = card.getBoundingClientRect();
+        const startWidth = rect.width;
+        const startHeight = rect.height;
+        card.classList.add("resizing");
+
+        const onMove = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+            const nextWidth = Math.max(columnWidth, startWidth + dx);
+            const nextSpan = Math.max(1, Math.min(columns, Math.round((nextWidth + gap) / (columnWidth + gap))));
+            applyCardSpan(card, nextSpan);
+            applyCardHeight(card, startHeight + dy);
+        };
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+            card.classList.remove("resizing");
+            saveLayoutState();
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+    }
     function attachCardTools(card){
         if (card.querySelector(".cardTools")) return;
         const tools = document.createElement("div");
@@ -868,14 +943,31 @@
             <button class="cardToolBtn" data-action="remove" title="Remover bloco"><i data-lucide="trash-2"></i></button>
         `;
         card.appendChild(tools);
+        const resizeHandle = document.createElement("button");
+        resizeHandle.type = "button";
+        resizeHandle.className = "cardResizeHandle";
+        resizeHandle.title = "Redimensionar livre";
+        resizeHandle.innerHTML = `<i data-lucide="move-diagonal-2"></i>`;
+        card.appendChild(resizeHandle);
 
         const moveBtn = tools.querySelector('[data-action="move"]');
         const shrinkBtn = tools.querySelector('[data-action="shrink"]');
         const growBtn = tools.querySelector('[data-action="grow"]');
         const removeBtn = tools.querySelector('[data-action="remove"]');
 
-        tools.addEventListener("mousedown", (ev) => ev.stopPropagation());
-        moveBtn.addEventListener("mousedown", (ev) => ev.stopPropagation());
+        tools.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+        moveBtn.addEventListener("pointerdown", (ev) => {
+            ev.stopPropagation();
+            if (!layoutEditMode) return;
+            card.draggable = true;
+        });
+        moveBtn.addEventListener("pointerup", () => {
+            if (!draggingCard) card.draggable = false;
+        });
+        moveBtn.addEventListener("pointerleave", () => {
+            if (!draggingCard) card.draggable = false;
+        });
+        resizeHandle.addEventListener("pointerdown", (ev) => startCardResize(card, ev));
 
         shrinkBtn.addEventListener("click", (ev) => {
             ev.preventDefault(); ev.stopPropagation();
@@ -895,7 +987,7 @@
         });
 
         card.addEventListener("dragstart", (ev) => {
-            if (!layoutEditMode || card.dataset.hidden === "1") {
+            if (!layoutEditMode || card.dataset.hidden === "1" || !card.draggable) {
                 ev.preventDefault();
                 return;
             }
@@ -908,6 +1000,7 @@
         });
         card.addEventListener("dragend", () => {
             draggingCard = null;
+            card.draggable = false;
             card.classList.remove("dragging");
             clearDropMarkers();
         });
@@ -943,7 +1036,7 @@
             clearDropMarkers();
         }
         layoutCards().forEach((card) => {
-            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
+            card.draggable = false;
         });
         refreshLayoutPicker();
     }
@@ -952,10 +1045,14 @@
         layoutCards().forEach((card) => {
             attachCardTools(card);
             applyCardSpan(card, getCardSpan(card));
+            applyCardHeight(card, getCardHeight(card));
         });
         applyLayoutState();
         syncLayoutMode();
         saveLayoutState();
+        window.addEventListener("resize", () => {
+            layoutCards().forEach((card) => applyCardSpan(card, getCardSpan(card)));
+        });
         btnLayoutEdit.addEventListener("click", () => {
             layoutEditMode = !layoutEditMode;
             syncLayoutMode();
