@@ -45,16 +45,13 @@
         .mono{font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
 
         .app{display:flex;height:100vh;overflow:hidden}
-        .app[data-view="dashboard"] .report-only{display:none !important}
-        .app[data-view="reports"] .dashboard-only{display:none !important}
-        .app[data-view="reports"] .report-scroll{max-height:calc(100vh - 170px);overflow:auto;padding-right:6px}
-        .app[data-view="reports"] .content{overflow:hidden}
         .sidebar{
             width:256px;background:var(--card);border-right:1px solid var(--border);
             padding:24px 12px;display:none;flex-direction:column;gap:4px;transition:.2s width;
         }
         .sidebar.compact{width:80px}
         .sidebar.compact .brandSub,.sidebar.compact .brandTitle,.sidebar.compact .navBtn span,.sidebar.compact .sidebarFooter{display:none}
+        .sidebar.compact .navCreateBtn span{display:none}
         .sidebar.hidden{width:0;padding:0;border-right:0;overflow:hidden}
         @media(min-width:1024px){.sidebar{display:flex}}
         .brand{display:flex;gap:12px;align-items:center;padding:0 12px;margin-bottom:28px}
@@ -82,10 +79,13 @@
         .app.layout-edit .navDeleteBtn{display:flex}
         .navDeleteBtn:disabled{opacity:.45;cursor:not-allowed}
         .navCreateBtn{
+            width:32px;height:32px;border-radius:10px;padding:0;margin:8px 0 0 12px;
             border:1px dashed color-mix(in oklch, var(--primary), transparent 55%);
-            color:var(--primary);
-            margin-top:6px;
+            background:transparent;color:var(--primary);cursor:pointer;opacity:.75;transition:.15s;
+            display:flex;align-items:center;justify-content:center;
         }
+        .navCreateBtn:hover{opacity:1;background:color-mix(in oklch,var(--primary),transparent 90%)}
+        .navCreateBtn i{width:16px;height:16px}
         .sidebarFooter{margin-top:auto;padding:0 12px}
         .sprintCard{background:var(--secondary);border-radius:12px;padding:14px}
         .sprintCard .k{font-size:12px;font-weight:700}
@@ -121,20 +121,28 @@
             color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-left:6px;
         }
 
-        .content{flex:1;overflow:hidden;padding:16px}
+        .content{flex:1;overflow:auto;padding:16px}
         @media(min-width:1024px){.content{padding:24px}}
         .titleBlock{margin-bottom:24px}
         .titleBlock h2{margin:0;font-size:20px;font-weight:700}
         .titleBlock p{margin:6px 0 0 0;font-size:13px;color:var(--muted-foreground)}
 
-        .gridStats,.grid2,.grid3,.grid4{display:grid;grid-template-columns:repeat(12,minmax(0,1fr))}
-        .gridStats{gap:16px}
-        .grid2,.grid3,.grid4{gap:24px}
+        /* Canvas livre de blocos */
+        .canvas{position:relative;width:100%;min-height:300px}
+        .app.layout-edit .canvas{
+            background-image:radial-gradient(color-mix(in oklch,var(--border),transparent 35%) 1px,transparent 1px);
+            background-size:24px 24px;
+        }
 
-        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative}
-        .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between}
+        .card{
+            background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+            position:absolute;display:flex;flex-direction:column;
+        }
+        .canvas > .card{left:0;top:0;width:320px;height:220px}
+        .cardHeader{padding:16px 18px 10px 18px;display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;gap:8px}
         .cardTitle{font-size:13px;font-weight:650}
-        .cardBody{padding:0 18px 18px 18px}
+        .cardBody{padding:0 18px 18px 18px;flex:1 1 auto;min-height:0;overflow:auto}
+        .cardBody.chart{display:flex;flex-direction:column;overflow:hidden}
 
         .statLabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600}
         .statIcon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}
@@ -149,7 +157,7 @@
         .dot.primary{background:var(--primary)}
         .dot.muted{background:color-mix(in oklch, var(--muted-foreground), transparent 70%)}
         .dot.c2{background:var(--chart-2)}
-        .chartWrap{height:260px;}
+        .chartWrap{position:relative;flex:1 1 auto;min-height:150px;width:100%}
 
         .err{
             display:none;
@@ -164,7 +172,7 @@
         }
 
         /* Cards list */
-        .list{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow:auto;padding-right:4px}
+        .list{display:flex;flex-direction:column;gap:12px;overflow:auto;padding-right:4px}
         .jiraCard{
             border:1px solid var(--border);
             background:color-mix(in oklch, var(--secondary), transparent 70%);
@@ -190,11 +198,11 @@
         .subline{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted-foreground)}
 
         /* Sprint progress */
-        .sprintWrap{display:flex;gap:16px;align-items:center}
+        .sprintWrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
         .ring{width:96px;height:96px;position:relative;flex:0 0 auto}
         .ring svg{width:96px;height:96px;transform: rotate(-90deg)}
         .ringCenter{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800}
-        .sprintLines{flex:1;display:flex;flex-direction:column;gap:8px}
+        .sprintLines{flex:1;min-width:160px;display:flex;flex-direction:column;gap:8px}
         .lineItem{display:flex;align-items:center;justify-content:space-between;font-size:12px}
         .lineLeft{display:flex;align-items:center;gap:8px;color:var(--muted-foreground)}
         .miniDot{width:10px;height:10px;border-radius:999px}
@@ -210,9 +218,9 @@
         .barItem .bar>div{height:100%;background:color-mix(in oklch,var(--primary),transparent 35%);border-radius:999px}
 
         /* Project distribution */
-        .projWrap{display:flex;gap:16px;align-items:center}
-        .donut{width:180px;height:180px;flex:0 0 auto}
-        .projList{flex:1;display:flex;flex-direction:column;gap:12px}
+        .projWrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+        .donut{width:160px;height:160px;flex:0 0 auto}
+        .projList{flex:1;min-width:160px;display:flex;flex-direction:column;gap:12px}
         .projItem{display:flex;gap:10px;align-items:center}
         .projNameRow{display:flex;justify-content:space-between;gap:10px;font-size:13px}
         .projBar{height:6px;background:var(--secondary);border-radius:999px;overflow:hidden;margin-top:6px}
@@ -259,10 +267,9 @@
         .sideOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:60;align-items:stretch;justify-content:flex-start}
         .sideSheet{width:256px;background:var(--card);border-right:1px solid var(--border);padding:24px 12px;display:flex;flex-direction:column;gap:4px}
 
-        .app.layout-edit .card{outline:1px dashed color-mix(in oklch,var(--primary),transparent 45%);outline-offset:-1px;cursor:grab}
-        .app.layout-edit .card.dragging{opacity:.45}
-        .app.layout-edit .card.drop-before{box-shadow:inset 0 4px 0 0 var(--primary)}
-        .app.layout-edit .card.drop-after{box-shadow:inset 0 -4px 0 0 var(--primary)}
+        .app.layout-edit .card{outline:1px dashed color-mix(in oklch,var(--primary),transparent 45%);outline-offset:-1px;cursor:grab;user-select:none}
+        .app.layout-edit .card.dragging{opacity:.9;cursor:grabbing;z-index:40;box-shadow:0 14px 30px rgba(0,0,0,.45)}
+        .card.size-copied{box-shadow:0 0 0 2px var(--success)}
         .cardTools{position:absolute;top:10px;right:10px;display:none;align-items:center;gap:6px;z-index:5}
         .app.layout-edit .cardTools{display:flex}
         .cardToolBtn{
@@ -270,14 +277,13 @@
             display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
         }
         .cardToolBtn:disabled{opacity:.45;cursor:not-allowed}
-        .cardToolBtn[data-action="move"]{cursor:grab}
         .cardResizeHandle{
             position:absolute;right:8px;bottom:8px;width:22px;height:22px;border-radius:8px;border:1px solid var(--border);
             background:color-mix(in oklch, var(--secondary), transparent 15%);color:var(--foreground);display:none;
             align-items:center;justify-content:center;cursor:nwse-resize;z-index:6;padding:0;
         }
         .app.layout-edit .cardResizeHandle{display:flex}
-        .app.layout-edit .card.resizing{box-shadow:0 0 0 1px var(--primary), 0 0 0 4px color-mix(in oklch, var(--primary), transparent 85%)}
+        .app.layout-edit .card.resizing{box-shadow:0 0 0 1px var(--primary), 0 0 0 4px color-mix(in oklch, var(--primary), transparent 85%);z-index:40}
 
         .layoutPicker{
             position:fixed;top:72px;right:18px;width:min(320px,calc(100vw - 36px));z-index:70;display:none;
@@ -306,7 +312,7 @@
     </style>
 </head>
 <body>
-<div class="app" id="appRoot" data-view="dashboard">
+<div class="app" id="appRoot">
     <aside class="sidebar" id="sidebarDesktop">
         <div class="brand">
             <div class="brandIcon"><i data-lucide="clock"></i></div>
@@ -317,7 +323,7 @@
         </div>
 
         <nav class="nav" id="navDesktop"></nav>
-        <button class="navBtn navCreateBtn" id="btnNewScreenDesktop"><i data-lucide="plus"></i><span>Nova Tela</span></button>
+        <button class="navCreateBtn" id="btnNewScreenDesktop" title="Nova Tela"><i data-lucide="plus"></i></button>
 
         <div class="sidebarFooter">
             <div class="sprintCard">
@@ -338,7 +344,7 @@
                 </div>
             </div>
             <nav class="nav" id="navMobile"></nav>
-            <button class="navBtn navCreateBtn" id="btnNewScreenMobile"><i data-lucide="plus"></i><span>Nova Tela</span></button>
+            <button class="navCreateBtn" id="btnNewScreenMobile" title="Nova Tela"><i data-lucide="plus"></i></button>
             <div class="sidebarFooter">
                 <div class="sprintCard">
                     <div class="k">Progresso do Mes</div>
@@ -385,211 +391,202 @@
 
             <div class="err" id="err"></div>
 
-            <div style="display:flex;flex-direction:column;gap:24px;">
-                <section class="gridStats dashboard-only">
-                    <div class="card">
-                        <div class="cardBody" style="padding-top:18px">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
-                                <span class="statLabel">Horas Registradas</span>
-                                <div class="statIcon" style="color:var(--primary);background: color-mix(in oklch, var(--primary), transparent 88%);">
-                                    <i data-lucide="clock"></i>
+            <div class="canvas" id="canvas">
+                <div class="card" data-block-key="stat-total" data-block-title="Horas Registradas">
+                    <div class="cardBody" style="padding-top:18px">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                            <span class="statLabel">Horas Registradas</span>
+                            <div class="statIcon" style="color:var(--primary);background: color-mix(in oklch, var(--primary), transparent 88%);">
+                                <i data-lucide="clock"></i>
+                            </div>
+                        </div>
+                        <div class="statValue mono" id="stat_total">—</div>
+                        <div class="statDetail" id="stat_total_detail">—</div>
+                        <div class="statTrend trendUp" id="stat_total_trend">—</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="stat-cards" data-block-title="Cartoes com Horas">
+                    <div class="cardBody" style="padding-top:18px">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                            <span class="statLabel">Cartoes com Horas</span>
+                            <div class="statIcon" style="color:var(--success);background: color-mix(in oklch, var(--success), transparent 88%);">
+                                <i data-lucide="target"></i>
+                            </div>
+                        </div>
+                        <div class="statValue mono" id="stat_cards">—</div>
+                        <div class="statDetail" id="stat_cards_detail">—</div>
+                        <div class="statTrend trendUp" id="stat_cards_trend">—</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="stat-avg" data-block-title="Media Diaria">
+                    <div class="cardBody" style="padding-top:18px">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                            <span class="statLabel">Media Diaria</span>
+                            <div class="statIcon" style="color:var(--warning);background: color-mix(in oklch, var(--warning), transparent 88%);">
+                                <i data-lucide="trending-up"></i>
+                            </div>
+                        </div>
+                        <div class="statValue mono" id="stat_avg">—</div>
+                        <div class="statDetail" id="stat_avg_detail">—</div>
+                        <div class="statTrend trendDown" id="stat_avg_trend">—</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="stat-streak" data-block-title="Streak de Produtividade">
+                    <div class="cardBody" style="padding-top:18px">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+                            <span class="statLabel">Streak de Produtividade</span>
+                            <div class="statIcon" style="color:var(--chart-5);background: color-mix(in oklch, var(--chart-5), transparent 88%);">
+                                <i data-lucide="flame"></i>
+                            </div>
+                        </div>
+                        <div class="statValue mono" id="stat_streak">—</div>
+                        <div class="statDetail" id="stat_streak_detail">—</div>
+                        <div class="statTrend trendUp" id="stat_streak_trend">—</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="chart-daily" data-block-title="Horas por Dia">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Horas por Dia</div>
+                        <div class="legend">
+                            <span><span class="dot primary"></span>Registradas</span>
+                            <span><span class="dot muted"></span>Estimadas</span>
+                        </div>
+                    </div>
+                    <div class="cardBody chart">
+                        <div class="chartWrap"><canvas id="chartDaily"></canvas></div>
+                        <div class="help" id="dailyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="chart-monthly" data-block-title="Horas por Mes">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Horas por Mes</div>
+                        <div class="legend">
+                            <span><span class="dot primary"></span>Registradas</span>
+                            <span><span class="dot c2"></span>Estimadas</span>
+                        </div>
+                    </div>
+                    <div class="cardBody chart">
+                        <div class="chartWrap"><canvas id="chartMonthly"></canvas></div>
+                        <div class="help" id="monthlyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="cards-list" data-block-title="Horas por Cartao">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Horas por Cartao</div>
+                        <div style="font-size:12px;color:var(--muted-foreground);" id="cardsCount">—</div>
+                    </div>
+                    <div class="cardBody">
+                        <div class="list" id="cardsList"></div>
+                        <div class="help" id="cardsEmpty" style="display:none;margin-top:8px;">Sem cartões com horas no período.</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="sprint" data-block-title="Progresso do Mes">
+                    <div class="cardHeader"><div class="cardTitle">Progresso do Mes</div></div>
+                    <div class="cardBody">
+                        <div class="sprintWrap">
+                            <div class="ring">
+                                <svg viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="var(--secondary)" stroke-width="8"></circle>
+                                    <circle id="ringProg" cx="50" cy="50" r="42" fill="none" stroke="var(--primary)" stroke-width="8"
+                                            stroke-linecap="round" stroke-dasharray="0 264"></circle>
+                                </svg>
+                                <div class="ringCenter mono" id="ringPct">0%</div>
+                            </div>
+                            <div class="sprintLines">
+                                <div class="lineItem">
+                                    <div class="lineLeft"><span class="miniDot est"></span>Estimativa</div>
+                                    <div class="lineVal mono" id="sprEst">—</div>
+                                </div>
+                                <div class="lineItem">
+                                    <div class="lineLeft"><span class="miniDot log"></span>Registradas</div>
+                                    <div class="lineVal mono" id="sprLog">—</div>
+                                </div>
+                                <div class="lineItem">
+                                    <div class="lineLeft"><span class="miniDot ot"></span>Hora Extra</div>
+                                    <div class="lineVal mono" id="sprOt">—</div>
+                                </div>
+                                <div class="lineItem" style="padding-top:6px;border-top:1px solid var(--border);">
+                                    <div class="lineLeft">Restantes</div>
+                                    <div class="lineVal mono" style="color:var(--warning)" id="sprRem">—</div>
                                 </div>
                             </div>
-                            <div class="statValue mono" id="stat_total">—</div>
-                            <div class="statDetail" id="stat_total_detail">—</div>
-                            <div class="statTrend trendUp" id="stat_total_trend">—</div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardBody" style="padding-top:18px">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
-                                <span class="statLabel">Cartoes com Horas</span>
-                                <div class="statIcon" style="color:var(--success);background: color-mix(in oklch, var(--success), transparent 88%);">
-                                    <i data-lucide="target"></i>
-                                </div>
-                            </div>
-                            <div class="statValue mono" id="stat_cards">—</div>
-                            <div class="statDetail" id="stat_cards_detail">—</div>
-                            <div class="statTrend trendUp" id="stat_cards_trend">—</div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardBody" style="padding-top:18px">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
-                                <span class="statLabel">Media Diaria</span>
-                                <div class="statIcon" style="color:var(--warning);background: color-mix(in oklch, var(--warning), transparent 88%);">
-                                    <i data-lucide="trending-up"></i>
-                                </div>
-                            </div>
-                            <div class="statValue mono" id="stat_avg">—</div>
-                            <div class="statDetail" id="stat_avg_detail">—</div>
-                            <div class="statTrend trendDown" id="stat_avg_trend">—</div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardBody" style="padding-top:18px">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
-                                <span class="statLabel">Streak de Produtividade</span>
-                                <div class="statIcon" style="color:var(--chart-5);background: color-mix(in oklch, var(--chart-5), transparent 88%);">
-                                    <i data-lucide="flame"></i>
-                                </div>
-                            </div>
-                            <div class="statValue mono" id="stat_streak">—</div>
-                            <div class="statDetail" id="stat_streak_detail">—</div>
-                            <div class="statTrend trendUp" id="stat_streak_trend">—</div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="grid2 dashboard-only">
-                    <div class="card">
-                        <div class="cardHeader">
-                            <div class="cardTitle">Horas por Dia</div>
-                            <div class="legend">
-                                <span><span class="dot primary"></span>Registradas</span>
-                                <span><span class="dot muted"></span>Estimadas</span>
-                            </div>
-                        </div>
-                        <div class="cardBody">
-                            <div class="chartWrap"><canvas id="chartDaily"></canvas></div>
-                            <div class="help" id="dailyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardHeader">
-                            <div class="cardTitle">Horas por Mes</div>
-                            <div class="legend">
-                                <span><span class="dot primary"></span>Registradas</span>
-                                <span><span class="dot c2"></span>Estimadas</span>
-                            </div>
-                        </div>
-                        <div class="cardBody">
-                            <div class="chartWrap"><canvas id="chartMonthly"></canvas></div>
-                            <div class="help" id="monthlyEmpty" style="display:none;margin-top:8px;">Sem dados no período.</div>
-                        </div>
-                    </div>
-                </section>
-
-                <div class="report-scroll customScroll report-only"><section class="grid3 report-only">
-                    <div class="card">
-                        <div class="cardHeader">
-                            <div class="cardTitle">Horas por Cartao</div>
-                            <div style="font-size:12px;color:var(--muted-foreground);" id="cardsCount">—</div>
-                        </div>
-                        <div class="cardBody">
-                            <div class="list" id="cardsList"></div>
-                            <div class="help" id="cardsEmpty" style="display:none;margin-top:8px;">Sem cartões com horas no período.</div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;flex-direction:column;gap:24px;">
-                        <div class="card">
-                            <div class="cardHeader"><div class="cardTitle">Progresso do Mes</div></div>
-                            <div class="cardBody">
-                                <div class="sprintWrap">
-                                    <div class="ring">
-                                        <svg viewBox="0 0 100 100">
-                                            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--secondary)" stroke-width="8"></circle>
-                                            <circle id="ringProg" cx="50" cy="50" r="42" fill="none" stroke="var(--primary)" stroke-width="8"
-                                                    stroke-linecap="round" stroke-dasharray="0 264"></circle>
-                                        </svg>
-                                        <div class="ringCenter mono" id="ringPct">0%</div>
-                                    </div>
-                                    <div class="sprintLines">
-                                        <div class="lineItem">
-                                            <div class="lineLeft"><span class="miniDot est"></span>Estimativa</div>
-                                            <div class="lineVal mono" id="sprEst">—</div>
-                                        </div>
-                                        <div class="lineItem">
-                                            <div class="lineLeft"><span class="miniDot log"></span>Registradas</div>
-                                            <div class="lineVal mono" id="sprLog">—</div>
-                                        </div>
-                                        <div class="lineItem">
-                                            <div class="lineLeft"><span class="miniDot ot"></span>Hora Extra</div>
-                                            <div class="lineVal mono" id="sprOt">—</div>
-                                        </div>
-                                        <div class="lineItem" style="padding-top:6px;border-top:1px solid var(--border);">
-                                            <div class="lineLeft">Restantes</div>
-                                            <div class="lineVal mono" style="color:var(--warning)" id="sprRem">—</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="sectionLabel">Precisao das Estimativas</div>
-                                <div class="barRow" id="accuracyBars"></div>
-                            </div>
                         </div>
 
-                        <div class="card">
-                            <div class="cardHeader"><div class="cardTitle">Distribuicao por Projeto</div></div>
-                            <div class="cardBody">
-                                <div class="projWrap">
-                                    <div class="donut"><canvas id="chartProjects"></canvas></div>
-                                    <div class="projList" id="projectsList"></div>
-                                </div>
-                                <div class="help" id="projectsEmpty" style="display:none;margin-top:8px;">Sem dados por projeto no período.</div>
-                            </div>
-                        </div>
+                        <div class="sectionLabel">Precisao das Estimativas</div>
+                        <div class="barRow" id="accuracyBars"></div>
                     </div>
-                </section>
+                </div>
 
-                <section class="grid4 report-only">
-                    <div class="card">
-                        <div class="cardHeader">
-                            <div class="cardTitle">Mapa de Calor Semanal</div>
-                            <div class="legend" style="gap:8px;font-size:11px">
-                                <span>Menos</span>
-                                <span class="dot" style="background:var(--secondary);border-radius:4px;width:12px;height:12px"></span>
-                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 80%);border-radius:4px;width:12px;height:12px"></span>
-                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 55%);border-radius:4px;width:12px;height:12px"></span>
-                                <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 30%);border-radius:4px;width:12px;height:12px"></span>
-                                <span class="dot" style="background: var(--primary);border-radius:4px;width:12px;height:12px"></span>
-                                <span>Mais</span>
-                            </div>
+                <div class="card" data-block-key="projects" data-block-title="Distribuicao por Projeto">
+                    <div class="cardHeader"><div class="cardTitle">Distribuicao por Projeto</div></div>
+                    <div class="cardBody">
+                        <div class="projWrap">
+                            <div class="donut"><canvas id="chartProjects"></canvas></div>
+                            <div class="projList" id="projectsList"></div>
                         </div>
-                        <div class="cardBody">
-                            <div style="overflow:auto">
-                                <table class="heatTable">
-                                    <thead>
-                                    <tr>
-                                        <th style="text-align:left;width:64px"></th>
-                                        <th style="text-align:center">Seg</th>
-                                        <th style="text-align:center">Ter</th>
-                                        <th style="text-align:center">Qua</th>
-                                        <th style="text-align:center">Qui</th>
-                                        <th style="text-align:center">Sex</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="heatBody"></tbody>
-                                </table>
-                            </div>
-                        </div>
+                        <div class="help" id="projectsEmpty" style="display:none;margin-top:8px;">Sem dados por projeto no período.</div>
                     </div>
-                    <div class="card">
-                        <div class="cardHeader"><div class="cardTitle">Cartoes Revisados</div></div>
-                        <div class="cardBody">
-                            <div style="height:220px"><canvas id="chartReviewed"></canvas></div>
-                            <div class="help" id="reviewedEmpty" style="display:none;margin-top:8px;">Sem cartoes revisados no período.</div>
-                        </div>
-                    </div>
+                </div>
 
-                    <div class="card">
-                        <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
-                        <div class="cardBody customScroll" style="max-height:260px;overflow:auto" id="dailyDetails"></div>
-                    </div>
-
-                    <div class="card">
-                        <div class="cardHeader"><div class="cardTitle">Atividade Recente</div></div>
-                        <div class="cardBody">
-                            <div class="activity" id="activity"></div>
-                            <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
+                <div class="card" data-block-key="heatmap" data-block-title="Mapa de Calor Semanal">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Mapa de Calor Semanal</div>
+                        <div class="legend" style="gap:8px;font-size:11px">
+                            <span>Menos</span>
+                            <span class="dot" style="background:var(--secondary);border-radius:4px;width:12px;height:12px"></span>
+                            <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 80%);border-radius:4px;width:12px;height:12px"></span>
+                            <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 55%);border-radius:4px;width:12px;height:12px"></span>
+                            <span class="dot" style="background: color-mix(in oklch, var(--primary), transparent 30%);border-radius:4px;width:12px;height:12px"></span>
+                            <span class="dot" style="background: var(--primary);border-radius:4px;width:12px;height:12px"></span>
+                            <span>Mais</span>
                         </div>
                     </div>
-                </section></div>
+                    <div class="cardBody">
+                        <div style="overflow:auto">
+                            <table class="heatTable">
+                                <thead>
+                                <tr>
+                                    <th style="text-align:left;width:64px"></th>
+                                    <th style="text-align:center">Seg</th>
+                                    <th style="text-align:center">Ter</th>
+                                    <th style="text-align:center">Qua</th>
+                                    <th style="text-align:center">Qui</th>
+                                    <th style="text-align:center">Sex</th>
+                                </tr>
+                                </thead>
+                                <tbody id="heatBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="reviewed" data-block-title="Cartoes Revisados">
+                    <div class="cardHeader"><div class="cardTitle">Cartoes Revisados</div></div>
+                    <div class="cardBody chart">
+                        <div class="chartWrap"><canvas id="chartReviewed"></canvas></div>
+                        <div class="help" id="reviewedEmpty" style="display:none;margin-top:8px;">Sem cartoes revisados no período.</div>
+                    </div>
+                </div>
+
+                <div class="card" data-block-key="daily-details" data-block-title="Relatorio Diario">
+                    <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
+                    <div class="cardBody customScroll" id="dailyDetails"></div>
+                </div>
+
+                <div class="card" data-block-key="activity" data-block-title="Atividade Recente">
+                    <div class="cardHeader"><div class="cardTitle">Atividade Recente</div></div>
+                    <div class="cardBody">
+                        <div class="activity" id="activity"></div>
+                        <div class="help" id="activityEmpty" style="display:none;margin-top:8px;">Sem atividade no período.</div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -611,16 +608,10 @@
             <input class="input" id="screenName" placeholder="Ex.: Planejamento">
         </div>
         <div class="field">
-            <label>Tipo base</label>
-            <select class="select2" id="screenBaseView">
-                <option value="dashboard" selected>Dashboard</option>
-                <option value="reports">Relatorios</option>
-            </select>
-        </div>
-        <div class="field">
             <label>Icone</label>
             <div class="screenIconGrid customScroll" id="screenIconGrid"></div>
         </div>
+        <div class="help">A nova tela começa com todos os blocos disponíveis. Use "Editar blocos" para arrastar, redimensionar e ocultar o que quiser.</div>
         <div class="btnRow">
             <button class="btn primary" id="btnCreateScreen"><i data-lucide="plus"></i>Criar Tela</button>
             <button class="btn" id="btnCancelScreen">Cancelar</button>
@@ -727,7 +718,6 @@
     const btnNewScreenMobile = document.getElementById("btnNewScreenMobile");
     const screenOverlayBackdrop = document.getElementById("screenOverlayBackdrop");
     const screenName = document.getElementById("screenName");
-    const screenBaseView = document.getElementById("screenBaseView");
     const screenIconGrid = document.getElementById("screenIconGrid");
     const navDesktop = document.getElementById("navDesktop");
     const navMobile = document.getElementById("navMobile");
@@ -755,7 +745,6 @@
     function closeSidebar(){ sideOverlay.style.display="none"; }
     function openScreenDialog(){
         screenName.value = "";
-        screenBaseView.value = "dashboard";
         selectedScreenIcon = SCREEN_ICON_OPTIONS[0];
         renderScreenIconPicker();
         screenOverlay.style.display = "flex";
@@ -767,9 +756,6 @@
     window.closeFilters = closeFilters;
     window.closeSidebar = closeSidebar;
 
-    function setView(view){
-        appRoot.dataset.view = view;
-    }
     function applySidebarMode(mode){
         sidebarDesktop.classList.remove('compact','hidden');
         if (mode==='compact') sidebarDesktop.classList.add('compact');
@@ -778,9 +764,8 @@
     }
     function defaultScreens(){
         return [
-            { id: "screen-overview", name: "Visao Geral", icon: "layout-dashboard", view: "dashboard" },
-            { id: "screen-hours", name: "Registro de Horas", icon: "clock", view: "dashboard" },
-            { id: "screen-reports", name: "Relatorios", icon: "bar-chart-3", view: "reports" },
+            { id: "screen-overview", name: "Visao Geral", icon: "layout-dashboard" },
+            { id: "screen-reports", name: "Relatorios", icon: "bar-chart-3" },
         ];
     }
     function normalizeScreens(list){
@@ -791,7 +776,6 @@
                 id: s.id || `screen-${i + 1}`,
                 name: String(s.name || `Tela ${i + 1}`).slice(0, 28),
                 icon: SCREEN_ICON_OPTIONS.includes(s.icon) ? s.icon : SCREEN_ICON_OPTIONS[0],
-                view: s.view === "reports" ? "reports" : "dashboard",
             }));
     }
     function loadScreens(){
@@ -843,7 +827,6 @@
         if (currentScreenId && currentScreenId !== next.id) saveLayoutState();
         currentScreenId = next.id;
         localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, currentScreenId);
-        setView(next.view);
         document.querySelectorAll(".navBtn[data-screen-id]").forEach((b) => b.classList.toggle("active", b.dataset.screenId === currentScreenId));
         if (applyLayout) {
             applyLayoutState();
@@ -852,10 +835,9 @@
     }
     function createScreenFromDialog(){
         const name = (screenName.value || "").trim() || `Tela ${screens.length + 1}`;
-        const view = screenBaseView.value === "reports" ? "reports" : "dashboard";
         const icon = SCREEN_ICON_OPTIONS.includes(selectedScreenIcon) ? selectedScreenIcon : SCREEN_ICON_OPTIONS[0];
         const id = `screen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        screens.push({ id, name: name.slice(0, 28), icon, view });
+        screens.push({ id, name: name.slice(0, 28), icon });
         saveScreens();
         renderScreensNav();
         applyActiveScreen(id, { applyLayout: true });
@@ -912,203 +894,143 @@
     screenOverlayBackdrop.addEventListener("click", closeScreenDialog);
     screenName.addEventListener("keydown", (ev) => { if (ev.key === "Enter") createScreenFromDialog(); });
 
-    const LAYOUT_KEY_PREFIX = "dashboardCardLayoutV2";
+    // ===================== Canvas livre de blocos =====================
+    const LAYOUT_KEY_PREFIX = "dashboardCanvasV1";
     let layoutEditMode = false;
-    let draggingCard = null;
+    const canvas = document.getElementById("canvas");
+
+    const MIN_CARD_W = 200;
+    const MIN_CARD_H = 130;
+    const CANVAS_PAD = 16;
+
+    // Tamanhos padrao (px) por bloco, usados na primeira montagem de cada tela.
+    const DEFAULT_SIZES = {
+        "stat-total":    { w: 280, h: 150 },
+        "stat-cards":    { w: 280, h: 150 },
+        "stat-avg":      { w: 280, h: 150 },
+        "stat-streak":   { w: 280, h: 150 },
+        "chart-daily":   { w: 560, h: 320 },
+        "chart-monthly": { w: 560, h: 320 },
+        "cards-list":    { w: 560, h: 440 },
+        "sprint":        { w: 460, h: 440 },
+        "projects":      { w: 460, h: 320 },
+        "heatmap":       { w: 580, h: 300 },
+        "reviewed":      { w: 460, h: 300 },
+        "daily-details": { w: 460, h: 300 },
+        "activity":      { w: 460, h: 300 },
+    };
+
     function currentLayoutKey(){
         return `${LAYOUT_KEY_PREFIX}:${currentScreenId || "default"}`;
     }
-
     function layoutCards(){
-        return Array.from(document.querySelectorAll("main.content .card"));
+        return Array.from(canvas.querySelectorAll(":scope > .card"));
     }
-    function layoutParents(){
-        return Array.from(document.querySelectorAll("main.content [data-layout-parent-id]"));
+    function blockKey(card){
+        return card.dataset.blockKey || card.dataset.blockTitle || "bloco";
     }
-    function viewportWidth(){
-        return window.innerWidth || document.documentElement.clientWidth || 1280;
+    function defaultSize(card){
+        return DEFAULT_SIZES[blockKey(card)] || { w: 380, h: 280 };
     }
-    function defaultSpanForCard(card){
-        const parent = card.parentElement;
-        if (!parent) return 12;
-        const vw = viewportWidth();
-        const siblings = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
-        const index = Math.max(0, siblings.indexOf(card));
+    function canvasWidth(){
+        return Math.max(320, canvas.clientWidth || 1100);
+    }
+    function resizeAllCharts(){
+        [chartDaily, chartMonthly, chartProjects, chartReviewed].forEach((c) => {
+            try { if (c) c.resize(); } catch (e) {}
+        });
+    }
 
-        if (parent.classList.contains("gridStats")) {
-            if (vw < 640) return 12;
-            if (vw < 1280) return 6;
-            return 3;
-        }
-        if (parent.classList.contains("grid2")) {
-            return vw < 1280 ? 12 : 6;
-        }
-        if (parent.classList.contains("grid3")) {
-            if (vw < 1280) return 12;
-            return index === 0 ? 8 : 4;
-        }
-        if (parent.classList.contains("grid4")) {
-            if (vw < 768) return 12;
-            if (vw < 1280) return 6;
-            return 3;
-        }
-        return 12;
+    // Gera um layout em "prateleiras" quando a tela ainda nao tem nada salvo.
+    function generateDefaultLayout(){
+        const cw = canvasWidth();
+        const out = {};
+        let x = 0, y = 0, rowH = 0;
+        layoutCards().forEach((card) => {
+            const d = defaultSize(card);
+            const w = Math.min(d.w, cw);
+            if (x > 0 && x + w > cw) { x = 0; y += rowH + CANVAS_PAD; rowH = 0; }
+            out[blockKey(card)] = { x, y, w, h: d.h, hidden: false };
+            x += w + CANVAS_PAD;
+            rowH = Math.max(rowH, d.h);
+        });
+        return out;
     }
-    function ensureLayoutMeta(){
-        const cards = layoutCards();
-        let idx = 1;
-        const parents = [];
-        cards.forEach((card) => {
-            if (!card.dataset.blockId) {
-                card.dataset.blockId = `block-${idx}`;
-                idx += 1;
-            }
-            if (!card.dataset.span) {
-                card.dataset.span = String(defaultSpanForCard(card));
-            }
-            if (!card.dataset.blockTitle) {
-                card.dataset.blockTitle = (
-                    card.querySelector(".cardTitle")?.textContent
-                    || card.querySelector(".statLabel")?.textContent
-                    || "Bloco"
-                ).trim();
-            }
-            if (card.parentElement && !parents.includes(card.parentElement)) {
-                parents.push(card.parentElement);
+    function loadLayout(){
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(currentLayoutKey()) || "null"); } catch {}
+        if (!saved || typeof saved !== "object") saved = generateDefaultLayout();
+        // Garante posicao para blocos novos (que nao existiam quando a tela foi salva).
+        let maxB = 0;
+        for (const k of Object.keys(saved)) {
+            const s = saved[k];
+            if (s && !s.hidden) maxB = Math.max(maxB, (s.y || 0) + (s.h || 0));
+        }
+        layoutCards().forEach((card) => {
+            const k = blockKey(card);
+            if (!saved[k]) {
+                const d = defaultSize(card);
+                saved[k] = { x: 0, y: maxB + CANVAS_PAD, w: d.w, h: d.h, hidden: false };
+                maxB += d.h + CANVAS_PAD;
             }
         });
-        parents.forEach((parent, index) => {
-            parent.dataset.layoutParentId = `layout-parent-${index + 1}`;
+        return saved;
+    }
+    function applyCardRect(card, s){
+        if (!s) s = defaultSize(card);
+        card.dataset.hidden = s.hidden ? "1" : "0";
+        if (s.hidden) { card.style.display = "none"; return; }
+        card.style.display = "flex";
+        card.style.left = `${Math.max(0, Math.round(s.x || 0))}px`;
+        card.style.top = `${Math.max(0, Math.round(s.y || 0))}px`;
+        card.style.width = `${Math.max(MIN_CARD_W, Math.round(s.w || defaultSize(card).w))}px`;
+        card.style.height = `${Math.max(MIN_CARD_H, Math.round(s.h || defaultSize(card).h))}px`;
+    }
+    function readState(){
+        const state = {};
+        layoutCards().forEach((card) => {
+            const d = defaultSize(card);
+            state[blockKey(card)] = {
+                x: parseFloat(card.style.left) || 0,
+                y: parseFloat(card.style.top) || 0,
+                w: parseFloat(card.style.width) || d.w,
+                h: parseFloat(card.style.height) || d.h,
+                hidden: card.dataset.hidden === "1",
+            };
         });
+        return state;
     }
-    function getMaxSpan(card){
-        const parent = card.parentElement;
-        if (!parent) return 1;
-        if (
-            parent.classList.contains("gridStats")
-            || parent.classList.contains("grid2")
-            || parent.classList.contains("grid3")
-            || parent.classList.contains("grid4")
-        ) return 12;
-        return 1;
+    function saveLayoutState(){
+        localStorage.setItem(currentLayoutKey(), JSON.stringify(readState()));
     }
-    function getCurrentGridColumns(parent){
-        if (!parent) return 1;
-        const raw = getComputedStyle(parent).gridTemplateColumns;
-        if (!raw || raw === "none") return 1;
-        return Math.max(1, raw.split(" ").filter(Boolean).length);
+    function updateCanvasHeight(){
+        let maxB = 0;
+        layoutCards().forEach((card) => {
+            if (card.dataset.hidden === "1") return;
+            const b = (parseFloat(card.style.top) || 0) + (parseFloat(card.style.height) || 0);
+            maxB = Math.max(maxB, b);
+        });
+        canvas.style.height = `${maxB + CANVAS_PAD * 2}px`;
     }
-    function getCardSpan(card){
-        return Math.max(1, Number(card.dataset.span || "1") || 1);
-    }
-    function minSpanForCard(card){
-        const parent = card.parentElement;
-        if (!parent) return 1;
-        const cols = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(parent)));
-        const containerWidth = parent.clientWidth || 0;
-        if (!containerWidth) return 1;
-        const minCardWidthPx = 220;
-        return Math.max(1, Math.min(cols, Math.ceil((minCardWidthPx * cols) / containerWidth)));
-    }
-    function applyCardSpan(card, span){
-        const max = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(card.parentElement)));
-        const min = minSpanForCard(card);
-        const safe = Math.max(min, Math.min(max, Number(span) || 1));
-        card.dataset.span = String(safe);
-        card.style.gridColumn = safe > 1 ? `span ${safe}` : "";
-        const shrink = card.querySelector('[data-action="shrink"]');
-        const grow = card.querySelector('[data-action="grow"]');
-        if (shrink) shrink.disabled = safe <= min;
-        if (grow) grow.disabled = safe >= max;
-    }
-    function getCardHeight(card){
-        return Math.max(0, Number(card.dataset.height || "0") || 0);
-    }
-    function applyCardHeight(card, px){
-        const raw = Math.round(Number(px) || 0);
-        if (raw <= 0) {
-            delete card.dataset.height;
-            card.style.minHeight = "";
-            return;
-        }
-        const safe = Math.max(140, raw);
-        card.dataset.height = String(safe);
-        card.style.minHeight = `${safe}px`;
+    function applyLayoutState(){
+        const state = loadLayout();
+        layoutCards().forEach((card) => applyCardRect(card, state[blockKey(card)]));
+        updateCanvasHeight();
+        resizeAllCharts();
     }
     function setCardHidden(card, hidden){
         card.dataset.hidden = hidden ? "1" : "0";
-        card.style.display = hidden ? "none" : "";
-        if (!hidden) {
-            applyCardSpan(card, getCardSpan(card));
-            applyCardHeight(card, getCardHeight(card));
-        }
+        card.style.display = hidden ? "none" : "flex";
+        updateCanvasHeight();
+        if (!hidden) resizeAllCharts();
     }
     function hiddenCards(){
         return layoutCards().filter((card) => card.dataset.hidden === "1");
     }
-    function clearDropMarkers(){
-        layoutCards().forEach((card) => card.classList.remove("drop-before", "drop-after"));
-    }
-    function saveLayoutState(){
-        const state = {};
-        const parents = Array.from(new Set(layoutCards().map((card) => card.parentElement).filter(Boolean)));
-        parents.forEach((parent) => {
-            const parentId = parent.dataset.layoutParentId;
-            const cards = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
-            state[parentId] = cards.map((card) => ({
-                id: card.dataset.blockId,
-                hidden: card.dataset.hidden === "1",
-                span: getCardSpan(card),
-                height: getCardHeight(card),
-            }));
-        });
-        localStorage.setItem(currentLayoutKey(), JSON.stringify(state));
-    }
-    function applyLayoutState(){
-        ensureLayoutMeta();
-        let saved = {};
-        try { saved = JSON.parse(localStorage.getItem(currentLayoutKey()) || "{}"); } catch {}
-
-        const parents = Array.from(new Set(layoutCards().map((card) => card.parentElement).filter(Boolean)));
-        parents.forEach((parent) => {
-            const parentId = parent.dataset.layoutParentId;
-            const rows = Array.isArray(saved[parentId]) ? saved[parentId] : [];
-            if (!rows.length) {
-                Array.from(parent.children).forEach((child) => {
-                    if (!child.classList?.contains("card")) return;
-                    setCardHidden(child, false);
-                    applyCardSpan(child, defaultSpanForCard(child));
-                    applyCardHeight(child, 0);
-                });
-                return;
-            }
-            const pos = new Map(rows.map((row, index) => [row.id, index]));
-            const cards = Array.from(parent.children).filter((el) => el.classList?.contains("card"));
-            cards.sort((a, b) => {
-                const ai = pos.has(a.dataset.blockId) ? pos.get(a.dataset.blockId) : Number.MAX_SAFE_INTEGER;
-                const bi = pos.has(b.dataset.blockId) ? pos.get(b.dataset.blockId) : Number.MAX_SAFE_INTEGER;
-                return ai - bi;
-            }).forEach((card) => parent.appendChild(card));
-
-            rows.forEach((row) => {
-                const card = parent.querySelector(`.card[data-block-id="${row.id}"]`);
-                if (!card) return;
-                setCardHidden(card, !!row.hidden);
-                applyCardSpan(card, row.span || 1);
-                applyCardHeight(card, row.height || 0);
-            });
-        });
-    }
-    function cardInCurrentView(card){
-        const view = appRoot.dataset.view;
-        if (view === "dashboard" && card.closest(".report-only")) return false;
-        if (view === "reports" && card.closest(".dashboard-only")) return false;
-        return true;
-    }
     function refreshLayoutPicker(){
-        const cards = layoutCards().filter(cardInCurrentView);
+        const cards = layoutCards();
         if (!cards.length) {
-            layoutPickerList.innerHTML = '<div class="help">Nenhum bloco nesta tela.</div>';
+            layoutPickerList.innerHTML = '<div class="help">Nenhum bloco disponivel.</div>';
             return;
         }
         layoutPickerList.innerHTML = cards.map((card) => {
@@ -1116,7 +1038,7 @@
             return `
             <div class="layoutItem">
                 <span>${escapeHtml(card.dataset.blockTitle || "Bloco")}</span>
-                <button class="cardToolBtn" data-toggle-block="${card.dataset.blockId}" title="${isHidden ? "Adicionar bloco" : "Remover bloco"}">
+                <button class="cardToolBtn" data-toggle-block="${blockKey(card)}" title="${isHidden ? "Adicionar bloco" : "Ocultar bloco"}">
                     <i data-lucide="${isHidden ? "plus" : "eye-off"}"></i>
                 </button>
             </div>
@@ -1124,7 +1046,7 @@
         }).join("");
         layoutPickerList.querySelectorAll("[data-toggle-block]").forEach((btn) => {
             btn.addEventListener("click", () => {
-                const card = document.querySelector(`.card[data-block-id="${btn.dataset.toggleBlock}"]`);
+                const card = layoutCards().find((c) => blockKey(c) === btn.dataset.toggleBlock);
                 if (!card) return;
                 setCardHidden(card, card.dataset.hidden !== "1");
                 saveLayoutState();
@@ -1137,174 +1059,130 @@
         if (!layoutEditMode || card.dataset.hidden === "1") return;
         startEvent.preventDefault();
         startEvent.stopPropagation();
-        card.draggable = false;
-
-        const parent = card.parentElement;
-        if (!parent) return;
-
-        const parentStyles = getComputedStyle(parent);
-        const gap = Number.parseFloat(parentStyles.columnGap || parentStyles.gap || "0") || 0;
-        const columns = Math.max(1, Math.min(getMaxSpan(card), getCurrentGridColumns(parent)));
-        const parentWidth = parent.clientWidth || card.getBoundingClientRect().width;
-        const columnWidth = columns > 0 ? (parentWidth - gap * (columns - 1)) / columns : parentWidth;
-
         const startX = startEvent.clientX;
         const startY = startEvent.clientY;
-        const rect = card.getBoundingClientRect();
-        const startWidth = rect.width;
-        const startHeight = rect.height;
+        const startW = parseFloat(card.style.width) || card.offsetWidth;
+        const startH = parseFloat(card.style.height) || card.offsetHeight;
         card.classList.add("resizing");
+        try { card.setPointerCapture(startEvent.pointerId); } catch {}
 
-        const onMove = (moveEvent) => {
-            const dx = moveEvent.clientX - startX;
-            const dy = moveEvent.clientY - startY;
-            const nextWidth = Math.max(columnWidth, startWidth + dx);
-            const nextSpan = Math.max(1, Math.min(columns, Math.round((nextWidth + gap) / (columnWidth + gap))));
-            applyCardSpan(card, nextSpan);
-            applyCardHeight(card, startHeight + dy);
+        const onMove = (e) => {
+            card.style.width = `${Math.max(MIN_CARD_W, startW + (e.clientX - startX))}px`;
+            card.style.height = `${Math.max(MIN_CARD_H, startH + (e.clientY - startY))}px`;
+            updateCanvasHeight();
+            resizeAllCharts();
         };
         const onUp = () => {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
             window.removeEventListener("pointercancel", onUp);
             card.classList.remove("resizing");
-            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
             saveLayoutState();
+            resizeAllCharts();
         };
-
         window.addEventListener("pointermove", onMove);
         window.addEventListener("pointerup", onUp);
         window.addEventListener("pointercancel", onUp);
+    }
+    function startCardDrag(card, startEvent){
+        if (!layoutEditMode || card.dataset.hidden === "1") return;
+        if (startEvent.button != null && startEvent.button !== 0) return;
+        if (startEvent.target.closest(".cardResizeHandle") || startEvent.target.closest(".cardTools")) return;
+        startEvent.preventDefault();
+        const startX = startEvent.clientX;
+        const startY = startEvent.clientY;
+        const startLeft = parseFloat(card.style.left) || 0;
+        const startTop = parseFloat(card.style.top) || 0;
+        let moved = false;
+        card.classList.add("dragging");
+        try { card.setPointerCapture(startEvent.pointerId); } catch {}
+
+        const onMove = (e) => {
+            moved = true;
+            card.style.left = `${Math.max(0, startLeft + (e.clientX - startX))}px`;
+            card.style.top = `${Math.max(0, startTop + (e.clientY - startY))}px`;
+            updateCanvasHeight();
+        };
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+            card.classList.remove("dragging");
+            if (moved) saveLayoutState();
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+    }
+    let copiedSize = null;
+    function updatePasteButtons(){
+        const enabled = !!copiedSize;
+        canvas.querySelectorAll('.cardToolBtn[data-action="paste-size"]').forEach((b) => { b.disabled = !enabled; });
+    }
+    function copyCardSize(card){
+        copiedSize = {
+            w: parseFloat(card.style.width) || card.offsetWidth,
+            h: parseFloat(card.style.height) || card.offsetHeight,
+        };
+        updatePasteButtons();
+        card.classList.add("size-copied");
+        setTimeout(() => card.classList.remove("size-copied"), 600);
+    }
+    function pasteCardSize(card){
+        if (!copiedSize) return;
+        card.style.width = `${Math.max(MIN_CARD_W, Math.round(copiedSize.w))}px`;
+        card.style.height = `${Math.max(MIN_CARD_H, Math.round(copiedSize.h))}px`;
+        updateCanvasHeight();
+        resizeAllCharts();
+        saveLayoutState();
     }
     function attachCardTools(card){
         if (card.querySelector(".cardTools")) return;
         const tools = document.createElement("div");
         tools.className = "cardTools";
         tools.innerHTML = `
-            <button class="cardToolBtn" data-action="move" title="Arrastar bloco"><i data-lucide="grip-vertical"></i></button>
-            <button class="cardToolBtn" data-action="shrink" title="Diminuir bloco"><i data-lucide="minus"></i></button>
-            <button class="cardToolBtn" data-action="grow" title="Aumentar bloco"><i data-lucide="plus"></i></button>
-            <button class="cardToolBtn" data-action="remove" title="Remover bloco"><i data-lucide="trash-2"></i></button>
+            <button class="cardToolBtn" data-action="copy-size" title="Copiar tamanho"><i data-lucide="copy"></i></button>
+            <button class="cardToolBtn" data-action="paste-size" title="Colar tamanho" disabled><i data-lucide="clipboard-paste"></i></button>
+            <button class="cardToolBtn" data-action="remove" title="Ocultar bloco"><i data-lucide="eye-off"></i></button>
         `;
         card.appendChild(tools);
+
         const resizeHandle = document.createElement("button");
         resizeHandle.type = "button";
         resizeHandle.className = "cardResizeHandle";
-        resizeHandle.title = "Redimensionar livre";
+        resizeHandle.title = "Redimensionar";
         resizeHandle.innerHTML = `<i data-lucide="move-diagonal-2"></i>`;
         card.appendChild(resizeHandle);
 
-        const moveBtn = tools.querySelector('[data-action="move"]');
-        const shrinkBtn = tools.querySelector('[data-action="shrink"]');
-        const growBtn = tools.querySelector('[data-action="grow"]');
-        const removeBtn = tools.querySelector('[data-action="remove"]');
-
         tools.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-        moveBtn.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-        resizeHandle.addEventListener("pointerdown", (ev) => startCardResize(card, ev));
-
-        shrinkBtn.addEventListener("click", (ev) => {
+        tools.querySelector('[data-action="copy-size"]').addEventListener("click", (ev) => {
             ev.preventDefault(); ev.stopPropagation();
-            applyCardSpan(card, getCardSpan(card) - 1);
-            saveLayoutState();
+            copyCardSize(card);
         });
-        growBtn.addEventListener("click", (ev) => {
+        tools.querySelector('[data-action="paste-size"]').addEventListener("click", (ev) => {
             ev.preventDefault(); ev.stopPropagation();
-            applyCardSpan(card, getCardSpan(card) + 1);
-            saveLayoutState();
+            pasteCardSize(card);
         });
-        removeBtn.addEventListener("click", (ev) => {
+        tools.querySelector('[data-action="remove"]').addEventListener("click", (ev) => {
             ev.preventDefault(); ev.stopPropagation();
             setCardHidden(card, true);
             saveLayoutState();
             refreshLayoutPicker();
         });
-
-        card.addEventListener("dragstart", (ev) => {
-            if (!layoutEditMode || card.dataset.hidden === "1") {
-                ev.preventDefault();
-                return;
-            }
-            draggingCard = card;
-            card.classList.add("dragging");
-            if (ev.dataTransfer) {
-                ev.dataTransfer.effectAllowed = "move";
-                ev.dataTransfer.setData("text/plain", card.dataset.blockId || "");
-            }
-        });
-        card.addEventListener("dragend", () => {
-            draggingCard = null;
-            card.classList.remove("dragging");
-            clearDropMarkers();
-        });
-        card.addEventListener("dragover", (ev) => {
-            if (!layoutEditMode || !draggingCard || draggingCard === card) return;
-            ev.preventDefault();
-            const rect = card.getBoundingClientRect();
-            const before = ev.clientY < rect.top + rect.height / 2;
-            card.classList.toggle("drop-before", before);
-            card.classList.toggle("drop-after", !before);
-        });
-        card.addEventListener("dragleave", () => {
-            card.classList.remove("drop-before", "drop-after");
-        });
-        card.addEventListener("drop", (ev) => {
-            if (!layoutEditMode || !draggingCard || draggingCard === card) return;
-            ev.preventDefault();
-            const rect = card.getBoundingClientRect();
-            const before = ev.clientY < rect.top + rect.height / 2;
-            card.classList.remove("drop-before", "drop-after");
-            card.parentElement.insertBefore(draggingCard, before ? card : card.nextSibling);
-            saveLayoutState();
-        });
-    }
-    function attachParentDropTargets(){
-        layoutParents().forEach((parent) => {
-            if (parent.dataset.dropReady === "1") return;
-            parent.dataset.dropReady = "1";
-
-            parent.addEventListener("dragover", (ev) => {
-                if (!layoutEditMode || !draggingCard) return;
-                ev.preventDefault();
-            });
-            parent.addEventListener("drop", (ev) => {
-                if (!layoutEditMode || !draggingCard) return;
-                const targetCard = ev.target?.closest?.(".card");
-                if (targetCard) return;
-                ev.preventDefault();
-                parent.appendChild(draggingCard);
-                clearDropMarkers();
-                saveLayoutState();
-            });
-        });
+        resizeHandle.addEventListener("pointerdown", (ev) => startCardResize(card, ev));
+        card.addEventListener("pointerdown", (ev) => startCardDrag(card, ev));
     }
     function syncLayoutMode(){
         appRoot.classList.toggle("layout-edit", layoutEditMode);
         btnLayoutEdit.classList.toggle("active", layoutEditMode);
         btnAddBlock.style.display = layoutEditMode ? "flex" : "none";
-        if (!layoutEditMode) {
-            layoutPicker.classList.remove("open");
-            clearDropMarkers();
-        }
-        layoutCards().forEach((card) => {
-            card.draggable = layoutEditMode && card.dataset.hidden !== "1";
-        });
+        if (!layoutEditMode) layoutPicker.classList.remove("open");
         refreshLayoutPicker();
     }
     function setupLayoutEditor(){
-        ensureLayoutMeta();
-        layoutCards().forEach((card) => {
-            attachCardTools(card);
-            applyCardSpan(card, getCardSpan(card));
-            applyCardHeight(card, getCardHeight(card));
-        });
-        attachParentDropTargets();
+        layoutCards().forEach(attachCardTools);
         applyLayoutState();
         syncLayoutMode();
-        saveLayoutState();
-        window.addEventListener("resize", () => {
-            layoutCards().forEach((card) => applyCardSpan(card, getCardSpan(card)));
-        });
         btnLayoutEdit.addEventListener("click", () => {
             layoutEditMode = !layoutEditMode;
             syncLayoutMode();
@@ -1319,6 +1197,7 @@
             if (layoutPicker.contains(ev.target) || btnAddBlock.contains(ev.target)) return;
             layoutPicker.classList.remove("open");
         });
+        window.addEventListener("resize", () => { updateCanvasHeight(); resizeAllCharts(); });
         safeIcons();
     }
 
@@ -1672,6 +1551,7 @@
     function renderTeam(d){
         const members = d.teamPerformance || [];
         const box = document.getElementById("teamBox");
+        if (!box) return;
         const max = Math.max(1, ...members.map(m => Number(m.totalHours || 0)));
         box.innerHTML = members.map(m => {
             const w = (Number(m.totalHours || 0) / max) * 100;
@@ -1793,6 +1673,7 @@
             renderReviewed(d);
             renderDailyDetails(d);
             renderActivity(d);
+            resizeAllCharts();
 
             showErr("");
             closeFilters();
