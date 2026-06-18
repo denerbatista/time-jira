@@ -108,11 +108,86 @@ function isoWeek(dateStr) {
     const week = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
     return { year: t.getUTCFullYear(), week };
 }
+// ===================== Feriados (nacionais + ES + Aracruz) =====================
+// Datas fixas no formato "MM-DD". Edite aqui para ajustar feriados municipais/estaduais.
+const FIXED_HOLIDAYS = [
+    // Nacionais
+    ["01-01", "Confraternização Universal"],
+    ["04-21", "Tiradentes"],
+    ["05-01", "Dia do Trabalho"],
+    ["09-07", "Independência"],
+    ["10-12", "Nossa Senhora Aparecida"],
+    ["11-02", "Finados"],
+    ["11-15", "Proclamação da República"],
+    ["11-20", "Consciência Negra"], // nacional desde 2024 (Lei 14.759/2023)
+    ["12-25", "Natal"],
+    // Municipais - Aracruz/ES
+    ["04-03", "Aniversário de Aracruz"],
+    ["06-24", "São João Batista (padroeiro de Aracruz)"],
+];
+// Feriados móveis: offset (em dias) a partir do Domingo de Páscoa.
+const EASTER_HOLIDAYS = [
+    [-48, "Segunda-feira de Carnaval"],
+    [-47, "Terça-feira de Carnaval"],
+    [-2,  "Sexta-feira Santa"],
+    [0,   "Páscoa"],
+    [8,   "Nossa Senhora da Penha (padroeira do ES)"], // estadual ES (segunda após o Domingo da Penha)
+    [60,  "Corpus Christi"],
+];
+// Feriados extras via env: EXTRA_HOLIDAYS="2026-02-20,2026-10-15"
+const EXTRA_HOLIDAYS = String(process.env.EXTRA_HOLIDAYS || "")
+    .split(",").map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s));
+
+function easterSunday(year) {
+    // Algoritmo de Computus (Meeus/Jones/Butcher) — Páscoa gregoriana
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = março, 4 = abril
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(Date.UTC(year, month - 1, day));
+}
+
+const holidayCache = new Map();
+function holidaysForYear(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    const set = new Set();
+    for (const [md] of FIXED_HOLIDAYS) set.add(`${year}-${md}`);
+    const easter = easterSunday(year);
+    for (const [off] of EASTER_HOLIDAYS) {
+        const d = new Date(easter.getTime());
+        d.setUTCDate(d.getUTCDate() + off);
+        set.add(isoDate(d));
+    }
+    holidayCache.set(year, set);
+    return set;
+}
+function isHoliday(dateStr) {
+    if (EXTRA_HOLIDAYS.includes(dateStr)) return true;
+    const year = parseInt(String(dateStr).slice(0, 4), 10);
+    if (!Number.isFinite(year)) return false;
+    return holidaysForYear(year).has(dateStr);
+}
+function isNonWorkingDay(dateStr, tz) {
+    const w = weekdayShort(dateStr, tz);
+    if (w === "Sat" || w === "Sun") return true;
+    return isHoliday(dateStr);
+}
+// ===============================================================================
+
 function businessDaysInSeries(series, tz){
     let bd=0;
     for (const x of series){
-        const w = weekdayShort(x.date, tz);
-        if (w==="Sat" || w==="Sun") continue;
+        if (isNonWorkingDay(x.date, tz)) continue;
         bd += 1;
     }
     return bd;
@@ -251,8 +326,7 @@ function cacheSet(key, payload){ cache.set(key, { at: Date.now(), payload }); }
 function computeStreak(series, minHours=7, tz=DEFAULT_TZ){
     let streak=0;
     for (let i=series.length-1;i>=0;i--){
-        const w = weekdayShort(series[i].date, tz);
-        if (w === "Sat" || w === "Sun") continue;
+        if (isNonWorkingDay(series[i].date, tz)) continue;
         if (series[i].hours >= minHours) streak += 1;
         else break;
     }
@@ -399,7 +473,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const streakAbove7h = computeStreak(completedDaysSeries, 7, tz);
 
     // Daily chart: last 14 business days
-    const weekdays = series.filter(x => !["Sat","Sun"].includes(weekdayShort(x.date, tz)));
+    const weekdays = series.filter(x => !isNonWorkingDay(x.date, tz));
     const last14 = weekdays.slice(Math.max(0, weekdays.length - 14));
     const dailyHoursChart = last14.map(x => ({ day: toDayLabelPtBR(x.date, tz), logged: x.hours, estimated: 8 }));
 
@@ -413,7 +487,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     }
     const monthlyHours = months.map((ym) => {
         const monthDays = series.filter(x => x.date.startsWith(ym));
-        const bd = monthDays.filter(x => !["Sat","Sun"].includes(weekdayShort(x.date, tz))).length;
+        const bd = monthDays.filter(x => !isNonWorkingDay(x.date, tz)).length;
         const estimated = bd * 8;
         const logged = round2(byMonth.get(ym) || 0);
         const overtime = Math.max(0, round2(logged - estimated));

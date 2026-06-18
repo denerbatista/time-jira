@@ -579,8 +579,7 @@
 
                     <div class="card">
                         <div class="cardHeader"><div class="cardTitle">Relatorio Diario</div></div>
-                        <div class="cardBody" style="max-height:260px;overflow:auto" id="dailyDetails" class="customScroll"></div>
-                    </div>
+                        <div class="cardBody customScroll" style="max-height:260px;overflow:auto" id="dailyDetails"></div>
                     </div>
 
                     <div class="card">
@@ -596,8 +595,8 @@
     </div>
 </div>
 
-<div class="layoutPicker" id="layoutPicker" role="dialog" aria-label="Blocos ocultos">
-    <div class="layoutPickerTitle">Blocos ocultos</div>
+<div class="layoutPicker" id="layoutPicker" role="dialog" aria-label="Blocos da tela">
+    <div class="layoutPickerTitle">Blocos da tela</div>
     <div class="layoutPickerList customScroll" id="layoutPickerList"></div>
 </div>
 
@@ -846,7 +845,10 @@
         localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, currentScreenId);
         setView(next.view);
         document.querySelectorAll(".navBtn[data-screen-id]").forEach((b) => b.classList.toggle("active", b.dataset.screenId === currentScreenId));
-        if (applyLayout) applyLayoutState();
+        if (applyLayout) {
+            applyLayoutState();
+            refreshLayoutPicker();
+        }
     }
     function createScreenFromDialog(){
         const name = (screenName.value || "").trim() || `Tela ${screens.length + 1}`;
@@ -1097,25 +1099,34 @@
             });
         });
     }
+    function cardInCurrentView(card){
+        const view = appRoot.dataset.view;
+        if (view === "dashboard" && card.closest(".report-only")) return false;
+        if (view === "reports" && card.closest(".dashboard-only")) return false;
+        return true;
+    }
     function refreshLayoutPicker(){
-        const hidden = hiddenCards();
-        if (!hidden.length) {
-            layoutPickerList.innerHTML = '<div class="help">Nenhum bloco oculto.</div>';
+        const cards = layoutCards().filter(cardInCurrentView);
+        if (!cards.length) {
+            layoutPickerList.innerHTML = '<div class="help">Nenhum bloco nesta tela.</div>';
             return;
         }
-        layoutPickerList.innerHTML = hidden.map((card) => `
+        layoutPickerList.innerHTML = cards.map((card) => {
+            const isHidden = card.dataset.hidden === "1";
+            return `
             <div class="layoutItem">
                 <span>${escapeHtml(card.dataset.blockTitle || "Bloco")}</span>
-                <button class="cardToolBtn" data-restore="${card.dataset.blockId}" title="Adicionar bloco">
-                    <i data-lucide="plus"></i>
+                <button class="cardToolBtn" data-toggle-block="${card.dataset.blockId}" title="${isHidden ? "Adicionar bloco" : "Remover bloco"}">
+                    <i data-lucide="${isHidden ? "plus" : "eye-off"}"></i>
                 </button>
             </div>
-        `).join("");
-        layoutPickerList.querySelectorAll("[data-restore]").forEach((btn) => {
+        `;
+        }).join("");
+        layoutPickerList.querySelectorAll("[data-toggle-block]").forEach((btn) => {
             btn.addEventListener("click", () => {
-                const card = document.querySelector(`.card[data-block-id="${btn.dataset.restore}"]`);
+                const card = document.querySelector(`.card[data-block-id="${btn.dataset.toggleBlock}"]`);
                 if (!card) return;
-                setCardHidden(card, false);
+                setCardHidden(card, card.dataset.hidden !== "1");
                 saveLayoutState();
                 refreshLayoutPicker();
             });
