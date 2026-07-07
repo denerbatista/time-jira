@@ -1,46 +1,57 @@
-import http from "node:http";
-import fs from "node:fs/promises";
-import path from "node:path";
-import process from "node:process";
-import { URL } from "node:url";
-
 /**
- * Jira Hours Dashboard (Backend) - no deps
+ * Jira Hours Dashboard — Cloudflare Worker (proxy CORS)
  *
- * Serves:
- *   GET /            -> static HTML file (separate)
- *   GET /api/hours   -> JSON used by the dashboard
- *   GET /health      -> ok
+ * Substitui o backend Node (index.mjs) para o front hospedado no GitHub Pages.
+ * O navegador NAO pode chamar a API do Jira Cloud diretamente (o Jira nao envia
+ * headers de CORS para chamadas autenticadas de outra origem). Este Worker faz
+ * esse papel de proxy: recebe as credenciais do usuario por header em cada
+ * requisicao, encaminha para o Jira e devolve o JSON ja agregado.
  *
- * Credenciais Jira:
- *   Enviadas pelo frontend em cada requisição via headers
+ * Rotas:
+ *   OPTIONS *          -> preflight CORS
+ *   GET /health        -> ok
+ *   GET /api/projects  -> lista de projetos com worklog do usuario
+ *   GET /api/hours     -> payload completo do dashboard
+ *
+ * Credenciais (por requisicao, nunca guardadas no Worker):
  *   x-jira-base-url, x-jira-email, x-jira-token
  *
- * Optional env:
- *   PORT=3000
- *   DEFAULT_TZ=America/Sao_Paulo
- *   DEFAULT_DAYS=30
- *   CACHE_TTL_MS=120000
- *   FRONTEND_FILE=./jira-hours-dashboard.html
+ * Variaveis de ambiente (opcionais, via `wrangler.toml [vars]` ou secrets):
+ *   ALLOWED_ORIGIN  -> origem(s) permitida(s), separadas por virgula.
+ *                      Ex.: "https://denerbatista.github.io". Default "*".
+ *   DEFAULT_TZ      -> "America/Sao_Paulo"
+ *   DEFAULT_DAYS    -> "30"
+ *   CACHE_TTL_MS    -> "120000"
+ *   EXTRA_HOLIDAYS  -> "2026-02-20,2026-10-15"
  */
 
-const PORT = Number(process.env.PORT || "3002");
+// ============================ Config por deploy ============================
+let CFG = null;
+function initCfg(env) {
+    if (CFG) return CFG;
+    CFG = {
+        ALLOWED_ORIGIN: String(env.ALLOWED_ORIGIN || "*"),
+        DEFAULT_TZ: String(env.DEFAULT_TZ || "America/Sao_Paulo"),
+        DEFAULT_DAYS: Number(env.DEFAULT_DAYS || "30"),
+        CACHE_TTL_MS: Number(env.CACHE_TTL_MS || "120000"),
+        EXTRA_HOLIDAYS: String(env.EXTRA_HOLIDAYS || "")
+            .split(",").map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)),
+    };
+    return CFG;
+}
 
-const DEFAULT_TZ = String(process.env.DEFAULT_TZ || "America/Sao_Paulo");
-const DEFAULT_DAYS = Number(process.env.DEFAULT_DAYS || "30");
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || "120000");
-
-const FRONTEND_FILE = process.env.FRONTEND_FILE
-    ? path.resolve(process.env.FRONTEND_FILE)
-    : path.resolve(process.cwd(), "index.html");
-
-const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
-
+// ============================ Utilidades base ============================
+function b64(s) {
+    const bytes = new TextEncoder().encode(s);
+    let bin = "";
+    for (const byte of bytes) bin += String.fromCharCode(byte);
+    return btoa(bin);
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clamp = (s, max = 4000) => String(s ?? "").trim().slice(0, max);
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
-function defaultRange(days = DEFAULT_DAYS) {
+function defaultRange(days) {
     const to = new Date();
     const from = new Date(to);
     from.setDate(from.getDate() - Math.max(1, days));
@@ -62,19 +73,19 @@ function normalizeExtraFilter(q, mode) {
     return looksLikeFreeText(raw) ? `text ~ "${escapeJqlString(raw)}"` : raw;
 }
 
-function safeNum(x, d=0){ const n=Number(x); return Number.isFinite(n)?n:d; }
-function round2(n){ return Math.round(n*100)/100; }
+function safeNum(x, d = 0) { const n = Number(x); return Number.isFinite(n) ? n : d; }
+function round2(n) { return Math.round(n * 100) / 100; }
 
 function dateKeyInTZ(dateTimeStr, tz) {
     const d = new Date(dateTimeStr);
-    return d.toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+    return d.toLocaleDateString("en-CA", { timeZone: tz });
 }
 function todayKeyInTZ(tz) {
-    return new Date().toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+    return new Date().toLocaleDateString("en-CA", { timeZone: tz });
 }
 function weekdayShort(dateStr, tz) {
     const d = new Date(`${dateStr}T12:00:00Z`);
-    return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(d); // Mon, Tue...
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(d);
 }
 function toDayLabelPtBR(dateStr, tz) {
     const d = new Date(`${dateStr}T12:00:00Z`);
@@ -83,7 +94,7 @@ function toDayLabelPtBR(dateStr, tz) {
 function monthLabelPtBR(yyyyMm) {
     const [y, m] = yyyyMm.split("-").map((v) => parseInt(v, 10));
     const d = new Date(Date.UTC(y, (m || 1) - 1, 15));
-    return new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "").replace(/^\w/, c => c.toUpperCase());
+    return new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(d).replace(".", "").replace(/^\w/, (c) => c.toUpperCase());
 }
 function eachDay(from, to) {
     const out = [];
@@ -94,10 +105,10 @@ function eachDay(from, to) {
 }
 function addMonths(yyyyMm, delta) {
     const [y0, m0] = yyyyMm.split("-").map((v) => parseInt(v, 10));
-    let y=y0, m=(m0||1)+delta;
-    while (m<=0){ m+=12; y-=1; }
-    while (m>12){ m-=12; y+=1; }
-    return `${y}-${String(m).padStart(2,"0")}`;
+    let y = y0, m = (m0 || 1) + delta;
+    while (m <= 0) { m += 12; y -= 1; }
+    while (m > 12) { m -= 12; y += 1; }
+    return `${y}-${String(m).padStart(2, "0")}`;
 }
 function isoWeek(dateStr) {
     const d = new Date(`${dateStr}T12:00:00Z`);
@@ -108,38 +119,31 @@ function isoWeek(dateStr) {
     const week = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
     return { year: t.getUTCFullYear(), week };
 }
-// ===================== Feriados (nacionais + ES + Aracruz) =====================
-// Datas fixas no formato "MM-DD". Edite aqui para ajustar feriados municipais/estaduais.
+
+// ============================ Feriados ============================
 const FIXED_HOLIDAYS = [
-    // Nacionais
-    ["01-01", "Confraternização Universal"],
+    ["01-01", "Confraternizacao Universal"],
     ["04-21", "Tiradentes"],
     ["05-01", "Dia do Trabalho"],
-    ["09-07", "Independência"],
+    ["09-07", "Independencia"],
     ["10-12", "Nossa Senhora Aparecida"],
     ["11-02", "Finados"],
-    ["11-15", "Proclamação da República"],
-    ["11-20", "Consciência Negra"], // nacional desde 2024 (Lei 14.759/2023)
+    ["11-15", "Proclamacao da Republica"],
+    ["11-20", "Consciencia Negra"],
     ["12-25", "Natal"],
-    // Municipais - Aracruz/ES
-    ["04-03", "Aniversário de Aracruz"],
-    ["06-24", "São João Batista (padroeiro de Aracruz)"],
+    ["04-03", "Aniversario de Aracruz"],
+    ["06-24", "Sao Joao Batista (padroeiro de Aracruz)"],
 ];
-// Feriados móveis: offset (em dias) a partir do Domingo de Páscoa.
 const EASTER_HOLIDAYS = [
     [-48, "Segunda-feira de Carnaval"],
-    [-47, "Terça-feira de Carnaval"],
-    [-2,  "Sexta-feira Santa"],
-    [0,   "Páscoa"],
-    [8,   "Nossa Senhora da Penha (padroeira do ES)"], // estadual ES (segunda após o Domingo da Penha)
-    [60,  "Corpus Christi"],
+    [-47, "Terca-feira de Carnaval"],
+    [-2, "Sexta-feira Santa"],
+    [0, "Pascoa"],
+    [8, "Nossa Senhora da Penha (padroeira do ES)"],
+    [60, "Corpus Christi"],
 ];
-// Feriados extras via env: EXTRA_HOLIDAYS="2026-02-20,2026-10-15"
-const EXTRA_HOLIDAYS = String(process.env.EXTRA_HOLIDAYS || "")
-    .split(",").map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s));
 
 function easterSunday(year) {
-    // Algoritmo de Computus (Meeus/Jones/Butcher) — Páscoa gregoriana
     const a = year % 19;
     const b = Math.floor(year / 100);
     const c = year % 100;
@@ -152,7 +156,7 @@ function easterSunday(year) {
     const k = c % 4;
     const l = (32 + 2 * e + 2 * i - h - k) % 7;
     const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = março, 4 = abril
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
     const day = ((h + l - 7 * m + 114) % 31) + 1;
     return new Date(Date.UTC(year, month - 1, day));
 }
@@ -172,7 +176,7 @@ function holidaysForYear(year) {
     return set;
 }
 function isHoliday(dateStr) {
-    if (EXTRA_HOLIDAYS.includes(dateStr)) return true;
+    if (CFG.EXTRA_HOLIDAYS.includes(dateStr)) return true;
     const year = parseInt(String(dateStr).slice(0, 4), 10);
     if (!Number.isFinite(year)) return false;
     return holidaysForYear(year).has(dateStr);
@@ -182,65 +186,64 @@ function isNonWorkingDay(dateStr, tz) {
     if (w === "Sat" || w === "Sun") return true;
     return isHoliday(dateStr);
 }
-// ===============================================================================
 
-function businessDaysInSeries(series, tz){
-    let bd=0;
-    for (const x of series){
+function businessDaysInSeries(series, tz) {
+    let bd = 0;
+    for (const x of series) {
         if (isNonWorkingDay(x.date, tz)) continue;
         bd += 1;
     }
     return bd;
 }
-function getInitials(name){
-    const parts = String(name||"").trim().split(/\s+/).filter(Boolean);
+function getInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
     const a = parts[0]?.[0] || "?";
-    const b = parts.length>1 ? parts[parts.length-1][0] : "";
-    return (a+b).toUpperCase();
+    const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return (a + b).toUpperCase();
 }
-function mapType(name){
-    const s=String(name||"").toLowerCase();
+function mapType(name) {
+    const s = String(name || "").toLowerCase();
     if (s.includes("bug") || s.includes("erro")) return "bug";
-    if (s.includes("epic") || s.includes("épico") || s.includes("epico")) return "epic";
+    if (s.includes("epic") || s.includes("epico")) return "epic";
     if (s.includes("story") || s.includes("hist")) return "story";
     return "task";
 }
-function mapPriority(name){
-    const s=String(name||"").toLowerCase();
+function mapPriority(name) {
+    const s = String(name || "").toLowerCase();
     if (s.includes("highest") || s.includes("high") || s.includes("alta")) return "high";
     if (s.includes("low") || s.includes("baixa") || s.includes("lowest")) return "low";
     return "medium";
 }
-function mapStatus(fieldsStatus){
-    const name = String(fieldsStatus?.name||"").toLowerCase();
-    const cat = String(fieldsStatus?.statusCategory?.key||"").toLowerCase(); // new, indeterminate, done
+function mapStatus(fieldsStatus) {
+    const name = String(fieldsStatus?.name || "").toLowerCase();
+    const cat = String(fieldsStatus?.statusCategory?.key || "").toLowerCase();
     if (name.includes("review") || name.includes("revis")) return "review";
-    if (cat==="done") return "done";
-    if (cat==="new") return "todo";
+    if (cat === "done") return "done";
+    if (cat === "new") return "todo";
     return "in_progress";
 }
-function isReviewStatusName(name){
-    const s = String(name||"").toLowerCase();
+function isReviewStatusName(name) {
+    const s = String(name || "").toLowerCase();
     // Apenas a coluna "Revisar" (revisao). Exclui "Code Review"/"codereview".
     if (s.includes("code")) return false;
     return s.includes("revis") || s.includes("review");
 }
 
-function authFromRequest(req) {
-    const baseUrl = String(req.headers["x-jira-base-url"] || "").trim().replace(/\/+$/, "");
-    const email = String(req.headers["x-jira-email"] || "").trim();
-    const token = String(req.headers["x-jira-token"] || "").trim();
+// ============================ Jira ============================
+function authFromRequest(request) {
+    const baseUrl = String(request.headers.get("x-jira-base-url") || "").trim().replace(/\/+$/, "");
+    const email = String(request.headers.get("x-jira-email") || "").trim();
+    const token = String(request.headers.get("x-jira-token") || "").trim();
     if (!baseUrl || !email || !token) {
         throw new Error("Credenciais ausentes. Informe base URL, e-mail e token.");
     }
-    return {
-        baseUrl,
-        email,
-        auth: `Basic ${b64(`${email}:${token}`)}`,
-    };
+    if (!/^https:\/\/[^/\s]+$/i.test(baseUrl)) {
+        throw new Error("Base URL invalida. Use https://empresa.atlassian.net");
+    }
+    return { baseUrl, email, auth: `Basic ${b64(`${email}:${token}`)}` };
 }
 
-async function jiraFetch(authConfig, urlPath, { method="GET", headers={}, body } = {}) {
+async function jiraFetch(authConfig, urlPath, { method = "GET", headers = {}, body } = {}) {
     const url = `${authConfig.baseUrl}${urlPath}`;
     const res = await fetch(url, {
         method,
@@ -254,7 +257,7 @@ async function jiraFetch(authConfig, urlPath, { method="GET", headers={}, body }
         return jiraFetch(authConfig, urlPath, { method, headers, body });
     }
 
-    const text = await res.text().catch(()=> "");
+    const text = await res.text().catch(() => "");
     if (!res.ok) throw new Error(`Jira API ${res.status} ${res.statusText} em ${urlPath}\n${text}`);
 
     try { return JSON.parse(text || "{}"); } catch { return {}; }
@@ -267,14 +270,14 @@ async function searchIssuesByJql(authConfig, jql) {
     while (true) {
         const payload = {
             jql,
-            fields: ["project","summary","status","priority","issuetype","assignee","timetracking","updated","created"],
+            fields: ["project", "summary", "status", "priority", "issuetype", "assignee", "timetracking", "updated", "created"],
             maxResults: 200,
             ...(nextPageToken ? { nextPageToken } : {}),
         };
 
         const page = await jiraFetch(authConfig, "/rest/api/3/search/jql", {
             method: "POST",
-            headers: { "Content-Type":"application/json" },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
 
@@ -287,8 +290,8 @@ async function searchIssuesByJql(authConfig, jql) {
 
 async function fetchAllWorklogs(authConfig, issueKey) {
     const all = [];
-    let startAt=0;
-    const maxResults=100;
+    let startAt = 0;
+    const maxResults = 100;
     while (true) {
         const page = await jiraFetch(authConfig, `/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog?startAt=${startAt}&maxResults=${maxResults}`);
         const worklogs = page.worklogs || [];
@@ -349,24 +352,24 @@ async function pMap(items, limit, fn) {
     return results;
 }
 
-function isLikelyWorklogAuthorJqlError(msg){
-    const s = String(msg||"");
+function isLikelyWorklogAuthorJqlError(msg) {
+    const s = String(msg || "");
     return /worklogAuthor/i.test(s) || /Erro na consulta JQL/i.test(s);
 }
 
-// Simple in-memory cache
-const cache = new Map(); // key -> { at, payload }
-function cacheGet(key){
+// Cache best-effort no escopo do isolate (efemero, mas ajuda em rajadas)
+const cache = new Map();
+function cacheGet(key) {
     const it = cache.get(key);
     if (!it) return null;
-    if (Date.now() - it.at > CACHE_TTL_MS) { cache.delete(key); return null; }
+    if (Date.now() - it.at > CFG.CACHE_TTL_MS) { cache.delete(key); return null; }
     return it.payload;
 }
-function cacheSet(key, payload){ cache.set(key, { at: Date.now(), payload }); }
+function cacheSet(key, payload) { cache.set(key, { at: Date.now(), payload }); }
 
-function computeStreak(series, minHours=7, tz=DEFAULT_TZ){
-    let streak=0;
-    for (let i=series.length-1;i>=0;i--){
+function computeStreak(series, minHours, tz) {
+    let streak = 0;
+    for (let i = series.length - 1; i >= 0; i--) {
         if (isNonWorkingDay(series[i].date, tz)) continue;
         if (series[i].hours >= minHours) streak += 1;
         else break;
@@ -382,7 +385,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const me = await jiraFetch(authConfig, "/rest/api/3/myself");
     const accountId = me?.accountId;
     const displayName = me?.displayName || authConfig.email;
-    if (!accountId) throw new Error("Não consegui obter accountId em /rest/api/3/myself");
+    if (!accountId) throw new Error("Nao consegui obter accountId em /rest/api/3/myself");
 
     const extra = normalizeExtraFilter(q, mode);
     let baseJql = `worklogDate >= "${from}" AND worklogDate <= "${to}"`;
@@ -409,30 +412,30 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     }
 
     const days = eachDay(from, to);
-    const byDaySeconds = new Map(days.map(d => [d, 0]));
-    const byIssueSeconds = new Map();     // key -> seconds
-    const byProjectSeconds = new Map();   // project -> seconds
-    const byTypeSeconds = new Map();      // type -> seconds
-    const recent = [];                   // worklog-level entries
-    const reviewedByDay = new Map(days.map(d => [d, 0]));
-    const dayDetails = new Map(days.map(d => [d, []]));
+    const byDaySeconds = new Map(days.map((d) => [d, 0]));
+    const byIssueSeconds = new Map();
+    const byProjectSeconds = new Map();
+    const byTypeSeconds = new Map();
+    const recent = [];
+    const reviewedByDay = new Map(days.map((d) => [d, 0]));
+    const dayDetails = new Map(days.map((d) => [d, []]));
 
-    const issueMeta = new Map(); // key -> meta used for cards
+    const issueMeta = new Map();
 
     await pMap(issues, concurrency, async (issue) => {
         const key = issue?.key;
         if (!key) return;
 
         const f = issue.fields || {};
-        const projectKey = f.project?.key || f.project?.name || "Sem projeto";
-        const projectName = f.project?.name || projectKey;
+        const pk = f.project?.key || f.project?.name || "Sem projeto";
+        const projectName = f.project?.name || pk;
         const summary = f.summary || key;
 
         issueMeta.set(key, {
             key,
             title: summary,
             project: projectName,
-            projectKey,
+            projectKey: pk,
             status: mapStatus(f.status),
             priority: mapPriority(f.priority?.name),
             type: mapType(f.issuetype?.name),
@@ -461,7 +464,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
 
             byDaySeconds.set(day, (byDaySeconds.get(day) || 0) + sec);
             byIssueSeconds.set(key, (byIssueSeconds.get(key) || 0) + sec);
-            byProjectSeconds.set(projectKey, (byProjectSeconds.get(projectKey) || 0) + sec);
+            byProjectSeconds.set(pk, (byProjectSeconds.get(pk) || 0) + sec);
 
             const t = mapType(f.issuetype?.name);
             byTypeSeconds.set(t, (byTypeSeconds.get(t) || 0) + sec);
@@ -496,7 +499,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     }));
 
     const dailyDetails = days.map((date) => {
-        const entries = (dayDetails.get(date) || []).sort((a,b) => new Date(a.started).getTime() - new Date(b.started).getTime());
+        const entries = (dayDetails.get(date) || []).sort((a, b) => new Date(a.started).getTime() - new Date(b.started).getTime());
         const totalSeconds = entries.reduce((acc, it) => acc + safeNum(it.seconds, 0), 0);
         return {
             date,
@@ -508,37 +511,34 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     }).filter((x) => x.entries.length > 0);
 
     const totalHours = round2(series.reduce((s, x) => s + x.hours, 0));
-    const daysWithHours = series.filter(x => x.hours > 0).length;
+    const daysWithHours = series.filter((x) => x.hours > 0).length;
     const avgDaily = series.length ? round2(totalHours / series.length) : 0;
     const todayTz = todayKeyInTZ(tz);
-    const completedDaysSeries = series.filter(x => x.date < todayTz);
+    const completedDaysSeries = series.filter((x) => x.date < todayTz);
     const streakAbove7h = computeStreak(completedDaysSeries, 7, tz);
 
-    // Daily chart: last 14 business days
-    const weekdays = series.filter(x => !isNonWorkingDay(x.date, tz));
+    const weekdays = series.filter((x) => !isNonWorkingDay(x.date, tz));
     const last14 = weekdays.slice(Math.max(0, weekdays.length - 14));
-    const dailyHoursChart = last14.map(x => ({ day: toDayLabelPtBR(x.date, tz), logged: x.hours, estimated: 8 }));
+    const dailyHoursChart = last14.map((x) => ({ day: toDayLabelPtBR(x.date, tz), logged: x.hours, estimated: 8 }));
 
-    // Monthly chart: last 6 months ending at `to`
-    const toYm = to.slice(0,7);
-    const months = Array.from({length:6}, (_,i)=> addMonths(toYm, -5+i));
+    const toYm = to.slice(0, 7);
+    const months = Array.from({ length: 6 }, (_, i) => addMonths(toYm, -5 + i));
     const byMonth = new Map();
     for (const x of series) {
-        const ym = x.date.slice(0,7);
+        const ym = x.date.slice(0, 7);
         byMonth.set(ym, (byMonth.get(ym) || 0) + x.hours);
     }
     const monthlyHours = months.map((ym) => {
-        const monthDays = series.filter(x => x.date.startsWith(ym));
-        const bd = monthDays.filter(x => !isNonWorkingDay(x.date, tz)).length;
+        const monthDays = series.filter((x) => x.date.startsWith(ym));
+        const bd = monthDays.filter((x) => !isNonWorkingDay(x.date, tz)).length;
         const estimated = bd * 8;
         const logged = round2(byMonth.get(ym) || 0);
         const overtime = Math.max(0, round2(logged - estimated));
         return { month: monthLabelPtBR(ym), logged, estimated, overtime };
     });
 
-    // Cards: top 20 by logged hours
     const cards = Array.from(byIssueSeconds.entries()).map(([k, sec]) => {
-        const meta = issueMeta.get(k) || { key: k, title: k, project: "—", status:"todo", priority:"medium", type:"task", assignee: displayName, avatarInitials:getInitials(displayName), estimatedSeconds:0, createdAt:"", updatedAt:"" };
+        const meta = issueMeta.get(k) || { key: k, title: k, project: "-", status: "todo", priority: "medium", type: "task", assignee: displayName, avatarInitials: getInitials(displayName), estimatedSeconds: 0, createdAt: "", updatedAt: "" };
         return {
             id: k,
             key: k,
@@ -546,7 +546,7 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
             status: meta.status,
             assignee: meta.assignee,
             avatarInitials: meta.avatarInitials,
-            sprint: "Período selecionado",
+            sprint: "Periodo selecionado",
             estimatedHours: round2(meta.estimatedSeconds / 3600),
             loggedHours: round2(sec / 3600),
             project: meta.project,
@@ -555,9 +555,8 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
             createdAt: meta.createdAt,
             updatedAt: meta.updatedAt,
         };
-    }).sort((a,b)=> b.loggedHours - a.loggedHours).slice(0, 20);
+    }).sort((a, b) => b.loggedHours - a.loggedHours).slice(0, 20);
 
-    // Sprint progress: estimate = business days in range * 8h
     const estRange = businessDaysInSeries(series, tz) * 8;
     const overtimeRange = Math.max(0, round2(totalHours - estRange));
     const remainingRange = Math.max(0, round2(estRange - totalHours));
@@ -570,33 +569,31 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
         percentComplete,
     };
 
-    // Project distribution: top 4
     const projectsArr = Array.from(byProjectSeconds.entries()).map(([pk, sec]) => {
-        const name = issues.find(it => (it.fields?.project?.key || it.fields?.project?.name) === pk)?.fields?.project?.name || pk;
+        const name = issues.find((it) => (it.fields?.project?.key || it.fields?.project?.name) === pk)?.fields?.project?.name || pk;
         return { key: pk, name, hours: round2(sec / 3600) };
-    }).sort((a,b)=> b.hours - a.hours);
-    const projectDistribution = projectsArr.slice(0,4).map(p => ({
+    }).sort((a, b) => b.hours - a.hours);
+    const projectDistribution = projectsArr.slice(0, 4).map((p) => ({
         name: p.name,
         hours: p.hours,
         percentage: totalHours > 0 ? Math.round((p.hours / totalHours) * 100) : 0,
     }));
 
-    // Weekly heatmap: last 6 ISO weeks
     const heatMap = new Map();
     for (const x of series) {
         const w = weekdayShort(x.date, tz);
-        if (w==="Sat" || w==="Sun") continue;
+        if (w === "Sat" || w === "Sun") continue;
         const wk = isoWeek(x.date);
-        const key = `${wk.year}-W${String(wk.week).padStart(2,"0")}`;
-        const row = heatMap.get(key) || { year:wk.year, week:wk.week, seg:0, ter:0, qua:0, qui:0, sex:0 };
-        if (w==="Mon") row.seg += x.hours;
-        if (w==="Tue") row.ter += x.hours;
-        if (w==="Wed") row.qua += x.hours;
-        if (w==="Thu") row.qui += x.hours;
-        if (w==="Fri") row.sex += x.hours;
+        const key = `${wk.year}-W${String(wk.week).padStart(2, "0")}`;
+        const row = heatMap.get(key) || { year: wk.year, week: wk.week, seg: 0, ter: 0, qua: 0, qui: 0, sex: 0 };
+        if (w === "Mon") row.seg += x.hours;
+        if (w === "Tue") row.ter += x.hours;
+        if (w === "Wed") row.qua += x.hours;
+        if (w === "Thu") row.qui += x.hours;
+        if (w === "Fri") row.sex += x.hours;
         heatMap.set(key, row);
     }
-    const weeklyHeatmap = Array.from(heatMap.entries()).sort(([a],[b])=> a.localeCompare(b)).slice(-6).map(([_, r]) => ({
+    const weeklyHeatmap = Array.from(heatMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([_, r]) => ({
         week: `Sem ${r.week}`,
         seg: Math.round(r.seg),
         ter: Math.round(r.ter),
@@ -605,34 +602,31 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
         sex: Math.round(r.sex),
     }));
 
-    // Category distribution (radar): derived from issue types (heuristic)
     const catMap = new Map();
     for (const [t, sec] of byTypeSeconds.entries()) {
         const hours = round2(sec / 3600);
         const cat =
             t === "story" ? "Frontend" :
-                t === "bug"   ? "Testes" :
-                    t === "epic"  ? "Docs" :
+                t === "bug" ? "Testes" :
+                    t === "epic" ? "Docs" :
                         "Backend";
         catMap.set(cat, (catMap.get(cat) || 0) + hours);
     }
     const categoryDistribution = Array.from(catMap.entries()).map(([category, hours]) => ({ category, hours: round2(hours) }))
-        .sort((a,b)=> b.hours - a.hours);
+        .sort((a, b) => b.hours - a.hours);
 
-    // Recent activity (last 5 worklogs)
-    recent.sort((a,b)=> new Date(b.started).getTime() - new Date(a.started).getTime());
-    const recentActivity = recent.slice(0,5).map((x) => ({
+    recent.sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime());
+    const recentActivity = recent.slice(0, 5).map((x) => ({
         key: x.key,
         title: x.title,
         assignee: x.assignee,
         status: x.status,
         updatedAt: x.started,
-        dateLabel: new Intl.DateTimeFormat("pt-BR", { timeZone: tz, day:"2-digit", month:"2-digit" }).format(new Date(x.started)),
+        dateLabel: new Intl.DateTimeFormat("pt-BR", { timeZone: tz, day: "2-digit", month: "2-digit" }).format(new Date(x.started)),
         hours: x.hours,
     }));
 
-    // Team performance: single user
-    const cardsDone = cards.filter(c => c.status === "done").length;
+    const cardsDone = cards.filter((c) => c.status === "done").length;
     const avgPerCard = cards.length ? round2(totalHours / cards.length) : 0;
     const teamPerformance = [{
         name: displayName,
@@ -645,11 +639,11 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const payload = {
         ok: true,
         cached: false,
-        cacheTtlMs: CACHE_TTL_MS,
+        cacheTtlMs: CFG.CACHE_TTL_MS,
         generatedAt: new Date().toISOString(),
         user: { accountId, displayName },
 
-        query: { from, to, tz, q: clamp(q, 2000), mode: String(mode||"auto"), author: String(authorFilter||"auto"), concurrency },
+        query: { from, to, tz, q: clamp(q, 2000), mode: String(mode || "auto"), author: String(authorFilter || "auto"), concurrency },
         filters: { extraNormalized: extra, jqlUsed },
 
         counts: {
@@ -696,92 +690,85 @@ async function fetchProjects(authConfig) {
         const name = issue?.fields?.project?.name || key;
         if (key) projects.set(key, { key, name });
     }
-    return Array.from(projects.values()).sort((a,b)=>a.name.localeCompare(b.name));
+    return Array.from(projects.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function sendJson(res, status, obj) {
-    res.writeHead(status, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-    });
-    res.end(JSON.stringify(obj));
-}
-
-async function sendFile(res, filePath, contentType) {
-    const buf = await fs.readFile(filePath);
-    res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
-    res.end(buf);
-}
-
-const server = http.createServer(async (req, res) => {
-    try {
-        const u = new URL(req.url, `http://localhost:${PORT}`);
-
-        if (req.method === "OPTIONS") {
-            res.writeHead(204, {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET,OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type,x-jira-base-url,x-jira-email,x-jira-token",
-            });
-            res.end();
-            return;
-        }
-
-        if (u.pathname === "/health") {
-            sendJson(res, 200, { ok: true, time: new Date().toISOString() });
-            return;
-        }
-
-        if (u.pathname === "/api/projects") {
-            const authConfig = authFromRequest(req);
-            const projects = await fetchProjects(authConfig);
-            sendJson(res, 200, { ok: true, projects });
-            return;
-        }
-
-        if (u.pathname === "/api/hours") {
-            const { from: defFrom, to: defTo } = defaultRange(DEFAULT_DAYS);
-
-            const from = clamp(u.searchParams.get("from") || defFrom, 20).slice(0, 10);
-            const to = clamp(u.searchParams.get("to") || defTo, 20).slice(0, 10);
-            const tz = clamp(u.searchParams.get("tz") || DEFAULT_TZ, 80) || DEFAULT_TZ;
-
-            const q = clamp(u.searchParams.get("q") || "", 2000);
-            const projectKey = clamp(u.searchParams.get("project") || "all", 40);
-            const mode = clamp(u.searchParams.get("mode") || "auto", 10);
-            const author = clamp(u.searchParams.get("author") || "auto", 10);
-            const concurrency = Math.min(10, Math.max(1, Number(u.searchParams.get("c") || "5")));
-
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-                sendJson(res, 400, { ok: false, error: "Datas inválidas. Use YYYY-MM-DD." });
-                return;
-            }
-            if (from > to) {
-                sendJson(res, 400, { ok: false, error: "Data inicial (from) não pode ser maior que a final (to)." });
-                return;
-            }
-
-            const authConfig = authFromRequest(req);
-            const payload = await buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter: author, concurrency, projectKey });
-            sendJson(res, 200, payload);
-            return;
-        }
-
-        if (u.pathname === "/" || u.pathname === "/index.html" || u.pathname === "/dashboard") {
-            await sendFile(res, FRONTEND_FILE, "text/html; charset=utf-8");
-            return;
-        }
-
-        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("Not Found");
-    } catch (e) {
-        sendJson(res, 500, { ok: false, error: String(e?.message || e) });
+// ============================ CORS + resposta ============================
+function corsHeaders(request) {
+    const allowed = CFG.ALLOWED_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+    const origin = request.headers.get("Origin") || "";
+    let allow = "*";
+    if (!allowed.includes("*")) {
+        allow = allowed.includes(origin) ? origin : (allowed[0] || "null");
     }
-});
+    return {
+        "Access-Control-Allow-Origin": allow,
+        "Vary": "Origin",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type,x-jira-base-url,x-jira-email,x-jira-token",
+        "Access-Control-Max-Age": "86400",
+    };
+}
+function json(request, status, obj) {
+    return new Response(JSON.stringify(obj), {
+        status,
+        headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            ...corsHeaders(request),
+        },
+    });
+}
 
-server.listen(PORT, () => {
-    console.log(`✅ Jira Hours Dashboard: http://localhost:${PORT}`);
-    console.log(`   Frontend: ${FRONTEND_FILE}`);
-    console.log(`   API: GET /api/hours?from=YYYY-MM-DD&to=YYYY-MM-DD&tz=America/Sao_Paulo&q=mps&mode=auto&author=auto&c=5`);
-});
+// ============================ Entrypoint ============================
+export default {
+    async fetch(request, env) {
+        initCfg(env);
+        try {
+            const u = new URL(request.url);
+
+            if (request.method === "OPTIONS") {
+                return new Response(null, { status: 204, headers: corsHeaders(request) });
+            }
+
+            if (u.pathname === "/health") {
+                return json(request, 200, { ok: true, time: new Date().toISOString() });
+            }
+
+            if (u.pathname === "/api/projects") {
+                const authConfig = authFromRequest(request);
+                const projects = await fetchProjects(authConfig);
+                return json(request, 200, { ok: true, projects });
+            }
+
+            if (u.pathname === "/api/hours") {
+                const { from: defFrom, to: defTo } = defaultRange(CFG.DEFAULT_DAYS);
+
+                const from = clamp(u.searchParams.get("from") || defFrom, 20).slice(0, 10);
+                const to = clamp(u.searchParams.get("to") || defTo, 20).slice(0, 10);
+                const tz = clamp(u.searchParams.get("tz") || CFG.DEFAULT_TZ, 80) || CFG.DEFAULT_TZ;
+
+                const q = clamp(u.searchParams.get("q") || "", 2000);
+                const projectKey = clamp(u.searchParams.get("project") || "all", 40);
+                const mode = clamp(u.searchParams.get("mode") || "auto", 10);
+                const author = clamp(u.searchParams.get("author") || "auto", 10);
+                const concurrency = Math.min(10, Math.max(1, Number(u.searchParams.get("c") || "5")));
+
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+                    return json(request, 400, { ok: false, error: "Datas invalidas. Use YYYY-MM-DD." });
+                }
+                if (from > to) {
+                    return json(request, 400, { ok: false, error: "Data inicial (from) nao pode ser maior que a final (to)." });
+                }
+
+                const authConfig = authFromRequest(request);
+                const payload = await buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter: author, concurrency, projectKey });
+                return json(request, 200, payload);
+            }
+
+            return json(request, 404, { ok: false, error: "Not Found" });
+        } catch (e) {
+            return json(request, 500, { ok: false, error: String(e?.message || e) });
+        }
+    },
+};

@@ -1,0 +1,14 @@
+name = "time-jira-proxy"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Variaveis de ambiente do Worker.
+# ALLOWED_ORIGIN: troque para a URL exata do seu GitHub Pages depois de publicar,
+# ex.: "https://denerbatista.github.io". Isso evita que terceiros usem seu proxy
+# a partir de outros sites. Use "*" apenas para testar.
+[vars]
+ALLOWED_ORIGIN = "*"
+DEFAULT_TZ = "America/Sao_Paulo"
+DEFAULT_DAYS = "30"
+CACHE_TTL_MS = "120000"
+# EXTRA_HOLIDAYS = "2026-02-20,2026-10-15"

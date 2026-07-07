@@ -309,6 +309,16 @@
         .customScroll::-webkit-scrollbar{width:8px;height:8px}
         .customScroll::-webkit-scrollbar-thumb{background:color-mix(in oklch,var(--primary),transparent 30%);border-radius:999px}
         .customScroll::-webkit-scrollbar-track{background:var(--secondary);border-radius:999px}
+        /* Scrollbar unificada (mesmo estilo do Relatorio Diario) em toda a aplicacao */
+        *{scrollbar-width:thin;scrollbar-color:color-mix(in oklch,var(--primary),transparent 30%) var(--secondary)}
+        *::-webkit-scrollbar{width:8px;height:8px}
+        *::-webkit-scrollbar-thumb{background:color-mix(in oklch,var(--primary),transparent 30%);border-radius:999px}
+        *::-webkit-scrollbar-thumb:hover{background:var(--primary)}
+        *::-webkit-scrollbar-track{background:transparent;border-radius:999px}
+        *::-webkit-scrollbar-corner{background:transparent}
+        .miniToggle{display:flex;gap:2px;background:var(--secondary);border:1px solid var(--border);border-radius:9px;padding:2px}
+        .miniToggle button{border:0;background:transparent;color:var(--muted-foreground);font-size:11px;font-weight:650;padding:3px 9px;border-radius:7px;cursor:pointer;line-height:1.4}
+        .miniToggle button.active{background:var(--primary);color:var(--primary-foreground)}
     </style>
 </head>
 <body>
@@ -568,7 +578,13 @@
                 </div>
 
                 <div class="card" data-block-key="reviewed" data-block-title="Cartoes Revisados">
-                    <div class="cardHeader"><div class="cardTitle">Cartoes Revisados</div></div>
+                    <div class="cardHeader">
+                        <div class="cardTitle">Cartoes Revisados</div>
+                        <div class="miniToggle" id="reviewedToggle">
+                            <button type="button" data-mode="day">Dia</button>
+                            <button type="button" data-mode="month">Mes</button>
+                        </div>
+                    </div>
                     <div class="cardBody chart">
                         <div class="chartWrap"><canvas id="chartReviewed"></canvas></div>
                         <div class="help" id="reviewedEmpty" style="display:none;margin-top:8px;">Sem cartoes revisados no período.</div>
@@ -688,9 +704,21 @@
         <div class="field"><label>Base URL</label><input class="input" id="auth_base" placeholder="https://empresa.atlassian.net"></div>
         <div class="field"><label>Email</label><input class="input" id="auth_email" placeholder="email@empresa.com"></div>
         <div class="field"><label>Token</label><input class="input" id="auth_token" placeholder="token"></div>
+        <div class="field" id="authPassField"><label>Senha (protege seu token neste navegador)</label><input class="input" type="password" id="auth_pass" placeholder="crie uma senha" autocomplete="new-password"></div>
         <div class="btnRow"><button class="btn primary" id="btnAuthSave">Salvar e entrar</button><button class="btn" id="btnLogout">Deslogar</button></div>
         <div class="help">Usuarios salvos</div>
         <div id="authUsers" style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow:auto"></div>
+    </div>
+    <div style="flex:1"></div>
+</div>
+
+<div class="overlay" id="unlockOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Desbloquear">
+    <div class="drawer" style="width:min(420px,92vw)">
+        <div class="drawerHeader"><div class="drawerTitle">Desbloquear</div></div>
+        <div class="help" style="margin-bottom:8px">Digite sua senha para acessar seu token salvo neste navegador.</div>
+        <div class="field"><label>Senha</label><input class="input" type="password" id="unlock_pass" placeholder="sua senha" autocomplete="current-password"></div>
+        <div class="btnRow"><button class="btn primary" id="btnUnlock">Entrar</button><button class="btn" id="btnForgot">Esqueci (resetar)</button></div>
+        <div class="help" id="unlockErr" style="display:none;color:#f87171;margin-top:8px"></div>
     </div>
     <div style="flex:1"></div>
 </div>
@@ -764,8 +792,11 @@
     }
     function defaultScreens(){
         return [
-            { id: "screen-overview", name: "Visao Geral", icon: "layout-dashboard" },
             { id: "screen-reports", name: "Relatorios", icon: "bar-chart-3" },
+            { id: "screen-1783096490390-3uvpae", name: "Tela 2", icon: "clock" },
+            { id: "screen-1783096574174-dghmc9", name: "Tela 3", icon: "target" },
+            { id: "screen-1783096997014-klx810", name: "Tela 4", icon: "flame" },
+            { id: "screen-1783097131706-pz03mh", name: "Tela 5", icon: "activity" },
         ];
     }
     function normalizeScreens(list){
@@ -920,6 +951,93 @@
         "activity":      { w: 460, h: 300 },
     };
 
+    // Layouts padrao por tela (arranjo inicial de fabrica). So sao usados quando
+    // a tela ainda nao tem nada salvo no localStorage. Blocos novos que nao
+    // constem aqui recebem posicao automatica em loadLayout().
+    const DEFAULT_LAYOUTS = {
+        "screen-reports": {
+            "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: false },
+            "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: false },
+            "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: false },
+            "stat-streak":   { x: 1385, y: 4,   w: 398,  h: 160, hidden: false },
+            "chart-daily":   { x: 4,    y: 169, w: 916,  h: 317, hidden: false },
+            "chart-monthly": { x: 926,  y: 171, w: 858,  h: 313, hidden: false },
+            "cards-list":    { x: 0,    y: 0,   w: 560,  h: 440, hidden: true  },
+            "sprint":        { x: 655,  y: 492, w: 538,  h: 301, hidden: false },
+            "projects":      { x: 1199, y: 488, w: 591,  h: 302, hidden: false },
+            "heatmap":       { x: 6,    y: 492, w: 642,  h: 302, hidden: false },
+            "reviewed":      { x: 0,    y: 0,   w: 1788, h: 726, hidden: true  },
+            "daily-details": { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
+            "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
+        },
+        "screen-1783096490390-3uvpae": {
+            "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
+            "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
+            "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
+            "stat-streak":   { x: 1385, y: 4,   w: 398,  h: 160, hidden: true  },
+            "chart-daily":   { x: 4,    y: 169, w: 916,  h: 317, hidden: true  },
+            "chart-monthly": { x: 926,  y: 171, w: 858,  h: 313, hidden: true  },
+            "cards-list":    { x: 0,    y: 0,   w: 1794, h: 733, hidden: false },
+            "sprint":        { x: 655,  y: 492, w: 538,  h: 301, hidden: true  },
+            "projects":      { x: 1199, y: 488, w: 591,  h: 302, hidden: true  },
+            "heatmap":       { x: 6,    y: 492, w: 642,  h: 302, hidden: true  },
+            "reviewed":      { x: 0,    y: 0,   w: 1788, h: 726, hidden: true  },
+            "daily-details": { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
+            "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
+        },
+        "screen-1783096574174-dghmc9": {
+            "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
+            "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
+            "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
+            "stat-streak":   { x: 1385, y: 4,   w: 398,  h: 160, hidden: true  },
+            "chart-daily":   { x: 4,    y: 169, w: 916,  h: 317, hidden: true  },
+            "chart-monthly": { x: 926,  y: 171, w: 858,  h: 313, hidden: true  },
+            "cards-list":    { x: 0,    y: 0,   w: 1794, h: 733, hidden: true  },
+            "sprint":        { x: 655,  y: 492, w: 538,  h: 301, hidden: true  },
+            "projects":      { x: 1199, y: 488, w: 591,  h: 302, hidden: true  },
+            "heatmap":       { x: 6,    y: 492, w: 642,  h: 302, hidden: true  },
+            "reviewed":      { x: 0,    y: 0,   w: 1788, h: 726, hidden: true  },
+            "daily-details": { x: 0,    y: 0,   w: 1795, h: 732, hidden: false },
+            "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
+        },
+        "screen-1783096997014-klx810": {
+            "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
+            "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
+            "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
+            "stat-streak":   { x: 1385, y: 4,   w: 398,  h: 160, hidden: true  },
+            "chart-daily":   { x: 4,    y: 169, w: 916,  h: 317, hidden: true  },
+            "chart-monthly": { x: 926,  y: 171, w: 858,  h: 313, hidden: true  },
+            "cards-list":    { x: 0,    y: 0,   w: 1794, h: 733, hidden: true  },
+            "sprint":        { x: 655,  y: 492, w: 538,  h: 301, hidden: true  },
+            "projects":      { x: 1199, y: 488, w: 591,  h: 302, hidden: true  },
+            "heatmap":       { x: 6,    y: 492, w: 642,  h: 302, hidden: true  },
+            "reviewed":      { x: 0,    y: 0,   w: 1788, h: 726, hidden: true  },
+            "daily-details": { x: 0,    y: 0,   w: 1795, h: 732, hidden: true  },
+            "activity":      { x: 0,    y: 0,   w: 1795, h: 715, hidden: false },
+        },
+        "screen-1783097131706-pz03mh": {
+            "stat-total":    { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
+            "stat-cards":    { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
+            "stat-avg":      { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
+            "stat-streak":   { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
+            "chart-daily":   { x: 0, y: 0, w: 560,  h: 320, hidden: true  },
+            "chart-monthly": { x: 0, y: 0, w: 560,  h: 320, hidden: true  },
+            "cards-list":    { x: 0, y: 0, w: 560,  h: 440, hidden: true  },
+            "sprint":        { x: 0, y: 0, w: 460,  h: 440, hidden: true  },
+            "projects":      { x: 0, y: 0, w: 460,  h: 320, hidden: true  },
+            "heatmap":       { x: 0, y: 0, w: 580,  h: 300, hidden: true  },
+            "reviewed":      { x: 0, y: 0, w: 1788, h: 726, hidden: false },
+            "daily-details": { x: 0, y: 0, w: 460,  h: 300, hidden: true  },
+            "activity":      { x: 0, y: 0, w: 460,  h: 300, hidden: true  },
+        },
+    };
+
+    function defaultLayoutFor(screenId){
+        const preset = DEFAULT_LAYOUTS[screenId];
+        if (preset) return JSON.parse(JSON.stringify(preset));
+        return generateDefaultLayout();
+    }
+
     function currentLayoutKey(){
         return `${LAYOUT_KEY_PREFIX}:${currentScreenId || "default"}`;
     }
@@ -959,7 +1077,7 @@
     function loadLayout(){
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(currentLayoutKey()) || "null"); } catch {}
-        if (!saved || typeof saved !== "object") saved = generateDefaultLayout();
+        if (!saved || typeof saved !== "object") saved = defaultLayoutFor(currentScreenId);
         // Garante posicao para blocos novos (que nao existiam quando a tela foi salva).
         let maxB = 0;
         for (const k of Object.keys(saved)) {
@@ -1226,11 +1344,32 @@
     const activeMonth = { d: new Date() };
 
     const STORAGE_KEYS = { users: "jiraUsersEnc", active: "jiraActiveEnc" };
-    const APP_SECRET = "time-jira-local-v2";
     const te = new TextEncoder(); const td = new TextDecoder();
     function b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
     function ub64(s){ return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
-    async function key(salt){ const base = await crypto.subtle.importKey("raw", te.encode(APP_SECRET + location.origin), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({name:"PBKDF2",salt:te.encode(salt),iterations:120000,hash:"SHA-256"}, base, {name:"AES-GCM",length:256}, false, ["encrypt","decrypt"]); }
+
+    // Criptografia do token protegida por SENHA DA SESSAO (nunca armazenada).
+    // A chave AES e derivada da senha que o usuario digita; sem ela, o conteudo
+    // salvo no localStorage e inutil. Salt aleatorio persistido por navegador.
+    const KDF_SALT_KEY = "jiraKdfSaltV1";
+    let sessionPass = null;
+    const keyCache = new Map();
+    function getKdfSalt(){
+        let s = localStorage.getItem(KDF_SALT_KEY);
+        if (!s){ s = b64(crypto.getRandomValues(new Uint8Array(16))); localStorage.setItem(KDF_SALT_KEY, s); }
+        return s;
+    }
+    async function key(salt){
+        if (!sessionPass) throw new Error("Sessao bloqueada: informe a senha.");
+        if (keyCache.has(salt)) return keyCache.get(salt);
+        const base = await crypto.subtle.importKey("raw", te.encode(sessionPass), "PBKDF2", false, ["deriveKey"]);
+        const k = await crypto.subtle.deriveKey(
+            { name:"PBKDF2", salt: te.encode(`${getKdfSalt()}|${salt}`), iterations:150000, hash:"SHA-256" },
+            base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
+        );
+        keyCache.set(salt, k);
+        return k;
+    }
     async function enc(text,salt){ const iv=crypto.getRandomValues(new Uint8Array(12)); const k=await key(salt); const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k,te.encode(text)); return JSON.stringify({iv:b64(iv),ct:b64(ct)}); }
     async function dec(payload,salt){ const o=JSON.parse(payload||"{}"); const k=await key(salt); const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(o.iv)},k,ub64(o.ct)); return td.decode(pt); }
     async function getUsers(){ const raw=localStorage.getItem(STORAGE_KEYS.users); if(!raw) return []; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload,"users")); }catch{return [];} }
@@ -1238,6 +1377,13 @@
     async function getActive(){ const raw=localStorage.getItem(STORAGE_KEYS.active); if(!raw) return null; try{ const e=JSON.parse(raw); return JSON.parse(await dec(e.payload, e.salt||"active")); }catch{return null;} }
     async function setActive(acc){ localStorage.setItem(STORAGE_KEYS.active, JSON.stringify({ salt:`${acc.baseUrl}|${acc.email}`, payload: await enc(JSON.stringify(acc), `${acc.baseUrl}|${acc.email}`) })); }
     let account = null;
+
+    // Base da API. Em localhost usa caminho relativo (backend node index.mjs).
+    // Em producao (GitHub Pages) aponta para o Cloudflare Worker.
+    // Pode ser sobrescrito sem editar o codigo via: localStorage.setItem('apiBase', 'https://...')
+    const API_BASE = (localStorage.getItem("apiBase") || (
+        /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "" : "https://time-jira-proxy.dener70.workers.dev"
+    )).replace(/\/+$/, "");
 
     function syncMonthRange(){
         const now = new Date();
@@ -1255,7 +1401,7 @@
 
     async function loadProjects(){
         if (!account) return;
-        const r = await fetch('/api/projects', { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+        const r = await fetch(`${API_BASE}/api/projects`, { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
         const j = await r.json();
         if (!r.ok || !j.ok) throw new Error(j.error || 'Falha ao carregar projetos');
         selProject.innerHTML = `<option value="all">Todos Projetos</option>` + (j.projects||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join('');
@@ -1309,7 +1455,7 @@
             c: f_c.value,
             project: selProject.value || 'all'
         });
-        const res = await fetch("/api/hours?" + params.toString(), { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+        const res = await fetch(`${API_BASE}/api/hours?` + params.toString(), { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data?.error || "Falha ao buscar dados.");
         return data;
@@ -1574,20 +1720,74 @@
         }).join("");
     }
 
+    function monthLabelShort(ym){
+        const [y, m] = String(ym).split("-").map(n => parseInt(n, 10));
+        const dt = new Date(Date.UTC(y, (m || 1) - 1, 15));
+        return new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" }).format(dt).replace(".", "");
+    }
+    function currentReviewedMode(){
+        return localStorage.getItem("reviewedChartMode") === "month" ? "month" : "day";
+    }
+    function setupReviewedToggle(){
+        const box = document.getElementById("reviewedToggle");
+        if (!box) return;
+        const sync = () => {
+            const m = currentReviewedMode();
+            box.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+        };
+        box.querySelectorAll("button").forEach(b => {
+            b.addEventListener("click", (e) => {
+                e.stopPropagation();
+                localStorage.setItem("reviewedChartMode", b.dataset.mode);
+                sync();
+                if (lastPayload) renderReviewed(lastPayload);
+            });
+        });
+        sync();
+    }
+
     function renderReviewed(d){
         if (!ensureChart()) return;
         const items = d.reviewedCardsChart || [];
-        const labels = items.map(x => x.label);
-        const values = items.map(x => x.reviewed);
-        const empty = !labels.length;
+        // "Vazio" quando nao ha nenhum ponto OU quando o total e zero
+        // (o array sempre tem 1 ponto por dia, entao checar o total e o que importa).
+        const total = items.reduce((a, x) => a + (Number(x.reviewed) || 0), 0);
+        const empty = !items.length || total === 0;
         document.getElementById("reviewedEmpty").style.display = empty ? "block" : "none";
         chartReviewed = destroy(chartReviewed);
         if (empty) return;
 
+        const mode = currentReviewedMode();
+        let labels, values, type;
+        if (mode === "month"){
+            const byMonth = new Map();
+            for (const it of items){
+                const ym = String(it.date || "").slice(0, 7);
+                if (!ym) continue;
+                byMonth.set(ym, (byMonth.get(ym) || 0) + (Number(it.reviewed) || 0));
+            }
+            const months = Array.from(byMonth.keys()).sort();
+            labels = months.map(monthLabelShort);
+            values = months.map(ym => byMonth.get(ym));
+            type = "bar";
+        } else {
+            labels = items.map(x => x.label);
+            values = items.map(x => Number(x.reviewed) || 0);
+            type = "line";
+        }
+
         chartReviewed = new Chart(document.getElementById("chartReviewed"), {
-            type:"line",
-            data:{ labels, datasets:[{ label:"Revisados", data: values, borderWidth:2, borderColor: COLORS[1], backgroundColor:"rgba(0,0,0,0)" }]},
-            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} } }
+            type,
+            data:{ labels, datasets:[{
+                label:"Revisados",
+                data: values,
+                borderWidth:2,
+                borderColor: COLORS[1],
+                backgroundColor: type === "bar" ? COLORS[1] : "rgba(0,0,0,0)",
+                borderRadius: type === "bar" ? 6 : 0,
+                maxBarThickness: 48,
+            }]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ precision:0 } } } }
         });
     }
 
@@ -1706,13 +1906,72 @@
     document.getElementById("btnLogout").addEventListener("click", ()=>{ localStorage.removeItem(STORAGE_KEYS.active); account = null; document.getElementById("authOverlay").style.display="flex"; });
     document.getElementById("btnAuthSave").addEventListener("click", async ()=>{
         const acc = { baseUrl: document.getElementById("auth_base").value.trim(), email: document.getElementById("auth_email").value.trim(), token: document.getElementById("auth_token").value.trim() };
+        const pass = document.getElementById("auth_pass").value;
         if (!acc.baseUrl || !acc.email || !acc.token) return;
+        // Se a sessao ainda nao esta desbloqueada, exige criar/usar a senha.
+        if (!sessionPass){
+            if (!pass){ alert("Crie uma senha para proteger seu token neste navegador."); return; }
+            sessionPass = pass; keyCache.clear();
+        }
+        document.getElementById("auth_pass").value = "";
         const users = (await getUsers()).filter(u => !(u.baseUrl===acc.baseUrl && u.email===acc.email));
         users.unshift(acc); await setUsers(users); await setActive(acc); account = acc;
         document.getElementById("authOverlay").style.display="none";
         await refreshUsers();
         await loadProjects();
         load();
+    });
+
+    // Carrega o app apos a sessao estar desbloqueada (senha ja definida).
+    async function bootWithAccount(){
+        document.getElementById("unlockOverlay").style.display="none";
+        account = await getActive();
+        if (!account){
+            document.getElementById("authOverlay").style.display="flex";
+            await refreshUsers();
+            return;
+        }
+        document.getElementById("authOverlay").style.display="none";
+        await refreshUsers();
+        await loadProjects();
+        load();
+    }
+
+    // Tenta desbloquear com a senha informada. Retorna true se decifrou o cofre.
+    async function tryUnlock(pass){
+        if (!pass) return false;
+        sessionPass = pass; keyCache.clear();
+        const rawActive = localStorage.getItem(STORAGE_KEYS.active);
+        const rawUsers = localStorage.getItem(STORAGE_KEYS.users);
+        const act = await getActive();
+        const usrs = await getUsers();
+        const ok = (rawActive && act) || (rawUsers && usrs.length > 0);
+        if (!ok){ sessionPass = null; keyCache.clear(); return false; }
+        return true;
+    }
+    async function doUnlock(){
+        const el = document.getElementById("unlock_pass");
+        const errEl = document.getElementById("unlockErr");
+        errEl.style.display = "none";
+        const ok = await tryUnlock(el.value);
+        if (!ok){
+            errEl.textContent = "Senha incorreta. Tente novamente.";
+            errEl.style.display = "block";
+            el.select();
+            return;
+        }
+        el.value = "";
+        await bootWithAccount();
+    }
+    document.getElementById("btnUnlock").addEventListener("click", doUnlock);
+    document.getElementById("unlock_pass").addEventListener("keydown", ev => { if (ev.key === "Enter") doUnlock(); });
+    document.getElementById("btnForgot").addEventListener("click", ()=>{
+        if (!confirm("Isso apaga o login/token salvos neste navegador (seu layout e mantido). Continuar?")) return;
+        localStorage.removeItem(STORAGE_KEYS.active);
+        localStorage.removeItem(STORAGE_KEYS.users);
+        localStorage.removeItem(KDF_SALT_KEY);
+        sessionPass = null; keyCache.clear();
+        location.reload();
     });
 
     // Enter to apply
@@ -1725,15 +1984,15 @@
         renderScreensNav();
         applyActiveScreen(currentScreenId, { applyLayout: false });
         setupLayoutEditor();
-        applySidebarMode(localStorage.getItem("sidebarMode") || "expanded");
-        account = await getActive();
-        if (!account) {
-            document.getElementById("authOverlay").style.display="flex";
-            await refreshUsers();
+        setupReviewedToggle();
+        applySidebarMode(localStorage.getItem("sidebarMode") || "compact");
+        const hasStore = !!localStorage.getItem(STORAGE_KEYS.active) || !!localStorage.getItem(STORAGE_KEYS.users);
+        if (hasStore && !sessionPass){
+            document.getElementById("unlockOverlay").style.display="flex";
+            setTimeout(()=>{ try{ document.getElementById("unlock_pass").focus(); }catch(e){} }, 50);
             return;
         }
-        await loadProjects();
-        load();
+        await bootWithAccount();
     })();
 </script>
 </body>
