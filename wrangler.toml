@@ -7,7 +7,7 @@ compatibility_date = "2025-01-01"
 # ex.: "https://denerbatista.github.io". Isso evita que terceiros usem seu proxy
 # a partir de outros sites. Use "*" apenas para testar.
 [vars]
-ALLOWED_ORIGIN = "*"
+ALLOWED_ORIGIN = "https://denerbatista.github.io"
 DEFAULT_TZ = "America/Sao_Paulo"
 DEFAULT_DAYS = "30"
 CACHE_TTL_MS = "120000"
