@@ -260,15 +260,21 @@ async function jiraFetch(authConfig, urlPath, { method="GET", headers={}, body }
     try { return JSON.parse(text || "{}"); } catch { return {}; }
 }
 
-async function searchIssuesByJql(authConfig, jql) {
+// withDetails=true embute worklog (cap 20/card) e changelog na propria busca,
+// para evitar 2 subrequests por card (critico no limite do Cloudflare Worker).
+async function searchIssuesByJql(authConfig, jql, { withDetails = false } = {}) {
     const issues = [];
     let nextPageToken = undefined;
+
+    const fields = ["project","summary","status","priority","issuetype","assignee","timetracking","updated","created"];
+    if (withDetails) fields.push("worklog");
 
     while (true) {
         const payload = {
             jql,
-            fields: ["project","summary","status","priority","issuetype","assignee","timetracking","updated","created"],
+            fields,
             maxResults: 200,
+            ...(withDetails ? { expand: "changelog" } : {}),
             ...(nextPageToken ? { nextPageToken } : {}),
         };
 
@@ -323,16 +329,44 @@ async function fetchStatusChanges(authConfig, issueKey) {
     return out;
 }
 
+// Extrai transicoes de status de um bloco de histories do changelog.
+function statusChangesFromHistories(histories) {
+    const out = [];
+    for (const h of histories || []) {
+        for (const item of (h.items || [])) {
+            if (String(item.field).toLowerCase() === "status") {
+                out.push({ created: h.created, toName: item.toString || item.to });
+            }
+        }
+    }
+    return out;
+}
+
 // Dia (YYYY-MM-DD no tz) em que o card entrou pela 1a vez na revisao dentro do periodo.
-// Retorna null se nunca entrou em revisao no intervalo. Conta o card uma unica vez.
-async function firstReviewDayInRange(authConfig, issueKey, tz, from, to) {
-    const changes = await fetchStatusChanges(authConfig, issueKey);
+// Usa o changelog ja embutido na busca (expand=changelog); so faz request extra
+// se o Jira truncou o historico (total > histories retornados).
+async function firstReviewDayInRange(authConfig, issue, tz, from, to) {
+    const cl = issue.changelog || {};
+    const histories = cl.histories || [];
+    const complete = safeNum(cl.total, histories.length) <= histories.length;
+    const changes = complete
+        ? statusChangesFromHistories(histories)
+        : await fetchStatusChanges(authConfig, issue.key);
     const days = changes
         .filter((c) => isReviewStatusName(c.toName))
         .map((c) => dateKeyInTZ(c.created, tz))
         .filter((day) => day >= from && day <= to)
         .sort();
     return days.length ? days[0] : null;
+}
+
+// Worklogs de um card. Usa os ja embutidos na busca (field "worklog", cap de 20);
+// so faz request extra se o card tiver mais de 20 worklogs (total > retornados).
+async function worklogsForIssue(authConfig, issue) {
+    const wl = issue.fields?.worklog || {};
+    const inline = wl.worklogs || [];
+    const complete = safeNum(wl.total, inline.length) <= inline.length;
+    return complete ? inline : fetchAllWorklogs(authConfig, issue.key);
 }
 
 async function pMap(items, limit, fn) {
@@ -394,17 +428,17 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     const af = String(authorFilter || "auto").toLowerCase();
     if (af === "on") {
         jqlUsed = `worklogAuthor = "${accountId}" AND ${baseJql}`;
-        issues = await searchIssuesByJql(authConfig, jqlUsed);
+        issues = await searchIssuesByJql(authConfig, jqlUsed, { withDetails: true });
     } else if (af === "off") {
-        issues = await searchIssuesByJql(authConfig, jqlUsed);
+        issues = await searchIssuesByJql(authConfig, jqlUsed, { withDetails: true });
     } else {
         try {
             jqlUsed = `worklogAuthor = "${accountId}" AND ${baseJql}`;
-            issues = await searchIssuesByJql(authConfig, jqlUsed);
+            issues = await searchIssuesByJql(authConfig, jqlUsed, { withDetails: true });
         } catch (e) {
             if (!isLikelyWorklogAuthorJqlError(e?.message)) throw e;
             jqlUsed = baseJql;
-            issues = await searchIssuesByJql(authConfig, jqlUsed);
+            issues = await searchIssuesByJql(authConfig, jqlUsed, { withDetails: true });
         }
     }
 
@@ -445,10 +479,10 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
 
         // Cartoes Revisados: conta o card 1x se passou pela coluna de revisao no periodo,
         // atribuido ao primeiro dia em que entrou em revisao (via changelog).
-        const reviewDay = await firstReviewDayInRange(authConfig, key, tz, from, to);
+        const reviewDay = await firstReviewDayInRange(authConfig, issue, tz, from, to);
         if (reviewDay) reviewedByDay.set(reviewDay, (reviewedByDay.get(reviewDay) || 0) + 1);
 
-        const worklogs = await fetchAllWorklogs(authConfig, key);
+        const worklogs = await worklogsForIssue(authConfig, issue);
         for (const wl of worklogs) {
             if (wl?.author?.accountId !== accountId) continue;
 

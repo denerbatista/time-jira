@@ -733,6 +733,15 @@
         if (!msg){ el.style.display="none"; el.textContent=""; return; }
         el.style.display="block"; el.textContent = msg;
     }
+    // Traduz erros tecnicos em orientacao acionavel para o usuario.
+    function friendlyErr(msg){
+        const s = String(msg || "");
+        if (/401|Unauthorized|authenticated/i.test(s))
+            return "Token do Jira invalido ou expirado. Clique no avatar, saia (Logout) e cadastre o token atual — gere um novo em id.atlassian.com/manage-profile/security/api-tokens se necessario.";
+        if (/Too many subrequests/i.test(s))
+            return "O proxy (Cloudflare Worker) atingiu o limite de requisicoes ao Jira. Faca o deploy da versao otimizada (npx wrangler deploy).";
+        return s;
+    }
 
     const overlay = document.getElementById("overlay");
     const sideOverlay = document.getElementById("sideOverlay");
@@ -1401,10 +1410,15 @@
 
     async function loadProjects(){
         if (!account) return;
-        const r = await fetch(`${API_BASE}/api/projects`, { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
-        const j = await r.json();
-        if (!r.ok || !j.ok) throw new Error(j.error || 'Falha ao carregar projetos');
-        selProject.innerHTML = `<option value="all">Todos Projetos</option>` + (j.projects||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join('');
+        try {
+            const r = await fetch(`${API_BASE}/api/projects`, { headers: { 'x-jira-base-url': account.baseUrl, 'x-jira-email': account.email, 'x-jira-token': account.token } });
+            const j = await r.json();
+            if (!r.ok || !j.ok) throw new Error(j.error || 'Falha ao carregar projetos');
+            selProject.innerHTML = `<option value="all">Todos Projetos</option>` + (j.projects||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join('');
+        } catch (e) {
+            // Nao propaga: um erro aqui nao pode travar o boot silenciosamente.
+            showErr(friendlyErr(e?.message || e));
+        }
     }
     selProject.addEventListener("change", ()=> load());
 
@@ -1878,7 +1892,7 @@
             showErr("");
             closeFilters();
         }catch(e){
-            showErr(String(e?.message || e));
+            showErr(friendlyErr(e?.message || e));
         }finally{
             btnApply.disabled = false;
             btnCsv.disabled = false;
