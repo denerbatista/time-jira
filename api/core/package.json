@@ -1,0 +1,16 @@
+{
+  "name": "core",
+  "version": "1.0.0",
+  "description": "Jira Hours Dashboard - backend (Bohr Function)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'no build needed'"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "express": "4.18.2",
+    "node-fetch": "2.7.0",
+    "serverless-http": "^3.2.0"
+  }
+}

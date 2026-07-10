@@ -1,3 +1,5 @@
 .env
 .txt
 *.identifier
+node_modules/
+.wrangler/
