@@ -1417,7 +1417,8 @@
     const f_c = document.getElementById("f_c");
     const selProject = document.getElementById("selProject");
     const monthLabel = document.getElementById("monthLabel");
-    const activeMonth = { d: new Date() };
+    // Ancora do mes ativo sempre em 1o do mes as 00:00 UTC (mes local de hoje).
+    const activeMonth = { d: new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1)) };
 
     const STORAGE_KEYS = { users: "jiraUsersEnc", active: "jiraActiveEnc" };
     const te = new TextEncoder(); const td = new TextDecoder();
@@ -1464,10 +1465,13 @@
     function syncMonthRange(){
         const now = new Date();
         const cur = activeMonth.d;
-        const same = cur.getUTCFullYear()===now.getUTCFullYear() && cur.getUTCMonth()===now.getUTCMonth();
+        // A ancora e UTC (1o do mes, 00:00Z): compara com o mes LOCAL de hoje e
+        // formata o rotulo em UTC — formatar no fuso local (UTC-3) faria
+        // 01/07 00:00Z virar 30/06 21:00 e o rotulo exibir o mes anterior.
+        const same = cur.getUTCFullYear()===now.getFullYear() && cur.getUTCMonth()===now.getMonth();
         f_from.value = firstDayOfMonth(cur);
         f_to.value = same ? isoToday() : lastDayOfMonth(cur);
-        monthLabel.textContent = new Intl.DateTimeFormat("pt-BR", { month:"short", year:"numeric" }).format(cur);
+        monthLabel.textContent = new Intl.DateTimeFormat("pt-BR", { month:"short", year:"numeric", timeZone:"UTC" }).format(cur);
         document.getElementById("subtitle").textContent = `Periodo ${f_from.value} ate ${f_to.value}`;
         document.getElementById("sprintLabel").textContent = monthLabel.textContent;
     }
