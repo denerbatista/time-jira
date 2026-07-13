@@ -714,6 +714,45 @@ async function buildDashboard(authConfig, { from, to, tz, q, mode, authorFilter,
     return payload;
 }
 
+// Passthrough 1:1 para a API do Jira. O front orquestra as chamadas e cada
+// invocacao do Worker gasta ~1 subrequest, eliminando o limite de 50 por
+// invocacao (plano gratuito) que estourava no /api/hours agregado em
+// periodos longos (varios meses/ano).
+async function proxyJira(request, u) {
+    const authConfig = authFromRequest(request);
+    const jiraPath = u.pathname.slice("/api/jira".length);
+    if (!jiraPath.startsWith("/rest/api/")) {
+        return json(request, 400, { ok: false, error: "Caminho nao permitido. Use /api/jira/rest/api/..." });
+    }
+    const method = request.method === "POST" ? "POST" : "GET";
+    const body = method === "POST" ? await request.text() : undefined;
+
+    for (let attempt = 0; ; attempt++) {
+        const res = await fetch(`${authConfig.baseUrl}${jiraPath}${u.search}`, {
+            method,
+            headers: {
+                Authorization: authConfig.auth,
+                Accept: "application/json",
+                ...(body ? { "Content-Type": "application/json" } : {}),
+            },
+            body,
+        });
+        if (res.status === 429 && attempt < 2) {
+            const retryAfter = safeNum(res.headers.get("retry-after"), 2);
+            await sleep(Math.max(1, retryAfter) * 1000);
+            continue;
+        }
+        const text = await res.text().catch(() => "");
+        const headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            ...corsHeaders(request),
+        };
+        if (res.status === 429) headers["Retry-After"] = String(res.headers.get("retry-after") || "2");
+        return new Response(text || "{}", { status: res.status, headers });
+    }
+}
+
 async function fetchProjects(authConfig) {
     const me = await jiraFetch(authConfig, "/rest/api/3/myself");
     const jql = `worklogAuthor = "${me.accountId}" ORDER BY updated DESC`;
@@ -767,6 +806,10 @@ export default {
 
             if (u.pathname === "/health") {
                 return json(request, 200, { ok: true, time: new Date().toISOString() });
+            }
+
+            if (u.pathname.startsWith("/api/jira/")) {
+                return await proxyJira(request, u);
             }
 
             if (u.pathname === "/api/projects") {

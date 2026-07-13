@@ -774,6 +774,49 @@ router.get("/projects", async (req, res) => {
     }
 });
 
+// Passthrough 1:1 para a API do Jira (paridade com o proxyJira do worker.js).
+// O front orquestra as chamadas e agrega no navegador.
+const jiraProxyBody = express.text({ type: "*/*", limit: "1mb" });
+router.all("/jira/*", jiraProxyBody, async (req, res) => {
+    try {
+        const authConfig = authFromRequest(req);
+        const jiraPath = req.path.slice("/jira".length);
+        if (!jiraPath.startsWith("/rest/api/")) {
+            return sendJson(res, 400, { ok: false, error: "Caminho nao permitido. Use /api/jira/rest/api/..." });
+        }
+        const method = req.method === "POST" ? "POST" : "GET";
+        const body = method === "POST" && typeof req.body === "string" && req.body.length ? req.body : undefined;
+        const qIdx = req.originalUrl.indexOf("?");
+        const search = qIdx >= 0 ? req.originalUrl.slice(qIdx) : "";
+
+        for (let attempt = 0; ; attempt++) {
+            const r = await fetchImpl(`${authConfig.baseUrl}${jiraPath}${search}`, {
+                method,
+                headers: {
+                    Authorization: authConfig.auth,
+                    Accept: "application/json",
+                    ...(body ? { "Content-Type": "application/json" } : {}),
+                },
+                body,
+            });
+            if (r.status === 429 && attempt < 2) {
+                const retryAfter = safeNum(r.headers.get("retry-after"), 2);
+                await sleep(Math.max(1, retryAfter) * 1000);
+                continue;
+            }
+            const text = await r.text().catch(() => "");
+            res.status(r.status).set({
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-store",
+                ...(r.status === 429 ? { "Retry-After": String(r.headers.get("retry-after") || "2") } : {}),
+            });
+            return res.send(text || "{}");
+        }
+    } catch (e) {
+        sendJson(res, 500, { ok: false, error: String(e?.message || e) });
+    }
+});
+
 router.get("/hours", async (req, res) => {
     try {
         const { from: defFrom, to: defTo } = defaultRange(CFG.DEFAULT_DAYS);

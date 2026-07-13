@@ -733,6 +733,54 @@ async function fetchProjects(authConfig) {
     return Array.from(projects.values()).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
+function readBody(req) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on("data", (c) => chunks.push(c));
+        req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        req.on("error", reject);
+    });
+}
+
+// Passthrough 1:1 para a API do Jira (paridade com o proxyJira do worker.js).
+// O front orquestra as chamadas e agrega no navegador.
+async function proxyJira(req, res, u) {
+    const authConfig = authFromRequest(req);
+    const jiraPath = u.pathname.slice("/api/jira".length);
+    if (!jiraPath.startsWith("/rest/api/")) {
+        sendJson(res, 400, { ok: false, error: "Caminho nao permitido. Use /api/jira/rest/api/..." });
+        return;
+    }
+    const method = req.method === "POST" ? "POST" : "GET";
+    const body = method === "POST" ? await readBody(req) : undefined;
+
+    for (let attempt = 0; ; attempt++) {
+        const r = await fetch(`${authConfig.baseUrl}${jiraPath}${u.search}`, {
+            method,
+            headers: {
+                Authorization: authConfig.auth,
+                Accept: "application/json",
+                ...(body ? { "Content-Type": "application/json" } : {}),
+            },
+            body,
+        });
+        if (r.status === 429 && attempt < 2) {
+            const retryAfter = safeNum(r.headers.get("retry-after"), 2);
+            await sleep(Math.max(1, retryAfter) * 1000);
+            continue;
+        }
+        const text = await r.text().catch(() => "");
+        res.writeHead(r.status, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            ...(r.status === 429 ? { "Retry-After": String(r.headers.get("retry-after") || "2") } : {}),
+        });
+        res.end(text || "{}");
+        return;
+    }
+}
+
 function sendJson(res, status, obj) {
     res.writeHead(status, {
         "Content-Type": "application/json; charset=utf-8",
@@ -755,7 +803,7 @@ const server = http.createServer(async (req, res) => {
         if (req.method === "OPTIONS") {
             res.writeHead(204, {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET,OPTIONS",
+                "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type,x-jira-base-url,x-jira-email,x-jira-token",
             });
             res.end();
@@ -764,6 +812,11 @@ const server = http.createServer(async (req, res) => {
 
         if (u.pathname === "/health") {
             sendJson(res, 200, { ok: true, time: new Date().toISOString() });
+            return;
+        }
+
+        if (u.pathname.startsWith("/api/jira/")) {
+            await proxyJira(req, res, u);
             return;
         }
 
