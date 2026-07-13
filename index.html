@@ -236,6 +236,25 @@
             color:color-mix(in oklch,var(--foreground),transparent 25%);
         }
 
+        /* Linha do tempo diaria */
+        .tlRuler{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+        .tlRulerTrack{position:relative;flex:1;height:16px}
+        .tlTick{position:absolute;top:0;font-size:10px;color:var(--muted-foreground);transform:translateX(-50%)}
+        .tlWrap{display:flex;flex-direction:column;gap:6px}
+        .tlRow{display:flex;align-items:center;gap:10px}
+        .tlDay{width:86px;flex:0 0 auto;font-size:11px;color:var(--muted-foreground);white-space:nowrap}
+        .tlDay b{color:var(--foreground);font-weight:650;text-transform:capitalize}
+        .tlTotal{width:52px;flex:0 0 auto;text-align:right;font-size:11px;font-weight:700}
+        .tlTrack{position:relative;flex:1;height:22px;border-radius:7px;background:var(--secondary);overflow:hidden}
+        .tlWork{position:absolute;top:0;bottom:0;background:color-mix(in oklch,var(--primary),transparent 94%)}
+        .tlGap{position:absolute;top:4px;bottom:4px;border-radius:4px;
+            background:repeating-linear-gradient(45deg, color-mix(in oklch,var(--destructive),transparent 78%) 0 4px, transparent 4px 8px)}
+        .tlSeg{position:absolute;top:4px;bottom:4px;border-radius:4px;opacity:.92}
+        .tlNow{position:absolute;top:0;bottom:0;width:2px;background:var(--chart-5)}
+        .tlEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+            font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in oklch,var(--destructive),transparent 25%)}
+        .dot.gap{background:repeating-linear-gradient(45deg, color-mix(in oklch,var(--destructive),transparent 60%) 0 3px, transparent 3px 6px);border-radius:3px}
+
         /* Recent activity */
         .activity{display:flex;flex-direction:column;gap:14px}
         .actRow{display:flex;gap:12px;align-items:flex-start}
@@ -577,6 +596,18 @@
                     </div>
                 </div>
 
+                <div class="card" data-block-key="day-timeline" data-block-title="Linha do Tempo de Registros">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Linha do Tempo de Registros</div>
+                        <div class="legend" style="gap:10px;font-size:11px">
+                            <span><span class="dot primary"></span>Registrado</span>
+                            <span><span class="dot gap" style="width:12px;height:12px"></span>Sem registro (08h–18h)</span>
+                            <span><span class="dot" style="background:var(--chart-5)"></span>Agora</span>
+                        </div>
+                    </div>
+                    <div class="cardBody customScroll" id="dayTimeline"></div>
+                </div>
+
                 <div class="card" data-block-key="reviewed" data-block-title="Cartoes Revisados">
                     <div class="cardHeader">
                         <div class="cardTitle">Cartoes Revisados</div>
@@ -806,6 +837,7 @@
             { id: "screen-1783096574174-dghmc9", name: "Tela 3", icon: "target" },
             { id: "screen-1783096997014-klx810", name: "Tela 4", icon: "flame" },
             { id: "screen-1783097131706-pz03mh", name: "Tela 5", icon: "activity" },
+            { id: "screen-timeline", name: "Linha do Tempo", icon: "calendar-days" },
         ];
     }
     function normalizeScreens(list){
@@ -824,6 +856,12 @@
             screens = normalizeScreens(raw ? JSON.parse(raw) : defaultScreens());
         } catch {
             screens = defaultScreens();
+        }
+        // Migracao: garante a aba "Linha do Tempo" para quem ja tinha telas salvas
+        // antes desse bloco existir.
+        if (!screens.some((s) => s.id === "screen-timeline")) {
+            screens.push({ id: "screen-timeline", name: "Linha do Tempo", icon: "calendar-days" });
+            saveScreens();
         }
     }
     function saveScreens(){
@@ -955,6 +993,7 @@
         "sprint":        { w: 460, h: 440 },
         "projects":      { w: 460, h: 320 },
         "heatmap":       { w: 580, h: 300 },
+        "day-timeline":  { w: 916, h: 400 },
         "reviewed":      { w: 460, h: 300 },
         "daily-details": { w: 460, h: 300 },
         "activity":      { w: 460, h: 300 },
@@ -965,6 +1004,7 @@
     // constem aqui recebem posicao automatica em loadLayout().
     const DEFAULT_LAYOUTS = {
         "screen-reports": {
+            "day-timeline":  { x: 0, y: 0, w: 916, h: 400, hidden: true },
             "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: false },
             "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: false },
             "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: false },
@@ -980,6 +1020,7 @@
             "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
         },
         "screen-1783096490390-3uvpae": {
+            "day-timeline":  { x: 0, y: 0, w: 916, h: 400, hidden: true },
             "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
             "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
             "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
@@ -995,6 +1036,7 @@
             "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
         },
         "screen-1783096574174-dghmc9": {
+            "day-timeline":  { x: 0, y: 0, w: 916, h: 400, hidden: true },
             "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
             "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
             "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
@@ -1010,6 +1052,7 @@
             "activity":      { x: 0,    y: 0,   w: 460,  h: 300, hidden: true  },
         },
         "screen-1783096997014-klx810": {
+            "day-timeline":  { x: 0, y: 0, w: 916, h: 400, hidden: true },
             "stat-total":    { x: 0,    y: 0,   w: 457,  h: 162, hidden: true  },
             "stat-cards":    { x: 463,  y: 3,   w: 457,  h: 162, hidden: true  },
             "stat-avg":      { x: 925,  y: 4,   w: 457,  h: 162, hidden: true  },
@@ -1024,7 +1067,24 @@
             "daily-details": { x: 0,    y: 0,   w: 1795, h: 732, hidden: true  },
             "activity":      { x: 0,    y: 0,   w: 1795, h: 715, hidden: false },
         },
+        "screen-timeline": {
+            "day-timeline":  { x: 0, y: 0, w: 1795, h: 732, hidden: false },
+            "stat-total":    { x: 0, y: 0, w: 457,  h: 162, hidden: true  },
+            "stat-cards":    { x: 0, y: 0, w: 457,  h: 162, hidden: true  },
+            "stat-avg":      { x: 0, y: 0, w: 457,  h: 162, hidden: true  },
+            "stat-streak":   { x: 0, y: 0, w: 398,  h: 160, hidden: true  },
+            "chart-daily":   { x: 0, y: 0, w: 916,  h: 317, hidden: true  },
+            "chart-monthly": { x: 0, y: 0, w: 858,  h: 313, hidden: true  },
+            "cards-list":    { x: 0, y: 0, w: 560,  h: 440, hidden: true  },
+            "sprint":        { x: 0, y: 0, w: 538,  h: 301, hidden: true  },
+            "projects":      { x: 0, y: 0, w: 591,  h: 302, hidden: true  },
+            "heatmap":       { x: 0, y: 0, w: 642,  h: 302, hidden: true  },
+            "reviewed":      { x: 0, y: 0, w: 1788, h: 726, hidden: true  },
+            "daily-details": { x: 0, y: 0, w: 460,  h: 300, hidden: true  },
+            "activity":      { x: 0, y: 0, w: 460,  h: 300, hidden: true  },
+        },
         "screen-1783097131706-pz03mh": {
+            "day-timeline":  { x: 0, y: 0, w: 916, h: 400, hidden: true },
             "stat-total":    { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
             "stat-cards":    { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
             "stat-avg":      { x: 0, y: 0, w: 280,  h: 150, hidden: true  },
@@ -1096,9 +1156,16 @@
         layoutCards().forEach((card) => {
             const k = blockKey(card);
             if (!saved[k]) {
-                const d = defaultSize(card);
-                saved[k] = { x: 0, y: maxB + CANVAS_PAD, w: d.w, h: d.h, hidden: false };
-                maxB += d.h + CANVAS_PAD;
+                // Bloco novo: respeita o preset da tela (ex.: oculto por padrao);
+                // sem preset, entra visivel abaixo do que ja existe.
+                const preset = (DEFAULT_LAYOUTS[currentScreenId] || {})[k];
+                if (preset) {
+                    saved[k] = { ...preset };
+                } else {
+                    const d = defaultSize(card);
+                    saved[k] = { x: 0, y: maxB + CANVAS_PAD, w: d.w, h: d.h, hidden: false };
+                    maxB += d.h + CANVAS_PAD;
+                }
             }
         });
         return saved;
@@ -1805,6 +1872,114 @@
         });
     }
 
+    // Linha do tempo diaria: uma faixa por dia com os worklogs posicionados
+    // pela hora de inicio (started) + duracao, e hachura nos periodos da
+    // janela util (08h-18h) que ficaram sem registro.
+    function renderDayTimeline(d){
+        const box = document.getElementById("dayTimeline");
+        if (!box) return;
+        const tz = d.query?.tz || "America/Sao_Paulo";
+        const detailMap = new Map((d.dailyDetails || []).map(x => [x.date, x]));
+        const allDays = (d.series || []).map(x => x.date);
+
+        const WORK_START = 8 * 60, WORK_END = 18 * 60;
+        const fmtHM = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+        const hmInTz = (iso) => {
+            const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
+            const [h, m] = parts.split(":").map(n => parseInt(n, 10));
+            return (h % 24) * 60 + m;
+        };
+        const tlColor = (key) => { let h = 0; for (const ch of String(key)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
+
+        let winStart = WORK_START, winEnd = WORK_END;
+        const rows = [];
+        for (const date of allDays){
+            const det = detailMap.get(date);
+            const entries = det?.entries || [];
+            const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
+            const weekend = dow === 0 || dow === 6;
+            if (weekend && !entries.length) continue;
+            const segs = entries.map(e => {
+                const start = hmInTz(e.started);
+                const end = Math.min(24 * 60, start + Math.round((Number(e.seconds) || 0) / 60));
+                return { start, end: Math.max(end, start + 4), key: e.key, title: e.title, formatted: e.formatted };
+            }).sort((a, b) => a.start - b.start);
+            for (const s of segs){ winStart = Math.min(winStart, s.start); winEnd = Math.max(winEnd, s.end); }
+            rows.push({ date, weekend, segs, totalSeconds: det?.totalSeconds || 0, formatted: det?.formatted || "" });
+        }
+
+        if (!rows.length){
+            box.innerHTML = '<div class="help">Sem dados no período.</div>';
+            return;
+        }
+
+        winStart = Math.max(0, Math.floor(winStart / 60) * 60);
+        winEnd = Math.min(24 * 60, Math.ceil(winEnd / 60) * 60);
+        const span = Math.max(60, winEnd - winStart);
+        const pct = (min) => ((Math.min(Math.max(min, winStart), winEnd) - winStart) / span) * 100;
+
+        // Buracos sem registro dentro da janela util (ignora pausas < 15 min).
+        const gapsFor = (segs) => {
+            const merged = [];
+            for (const s of segs){
+                const last = merged[merged.length - 1];
+                if (last && s.start <= last.end) last.end = Math.max(last.end, s.end);
+                else merged.push({ start: s.start, end: s.end });
+            }
+            const gaps = [];
+            let cur = WORK_START;
+            for (const m of merged){
+                if (m.start > cur) gaps.push({ start: cur, end: Math.min(m.start, WORK_END) });
+                cur = Math.max(cur, m.end);
+                if (cur >= WORK_END) break;
+            }
+            if (cur < WORK_END) gaps.push({ start: cur, end: WORK_END });
+            return gaps.filter(g => g.end - g.start >= 15);
+        };
+
+        const todayTz = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+        const nowMin = hmInTz(new Date().toISOString());
+
+        const ticks = [];
+        for (let t = Math.ceil(winStart / 120) * 120; t <= winEnd; t += 120) ticks.push(t);
+        const ruler = `
+            <div class="tlRuler">
+                <div class="tlDay"></div>
+                <div class="tlRulerTrack">${ticks.map(t => `<span class="tlTick" style="left:${pct(t)}%">${Math.floor(t / 60)}h</span>`).join("")}</div>
+                <div class="tlTotal"></div>
+            </div>`;
+
+        const weekdayLabel = (date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "short" })
+            .format(new Date(`${date}T12:00:00Z`)).replace(".", "");
+
+        box.innerHTML = ruler + '<div class="tlWrap">' + rows.slice().reverse().map(r => {
+            const empty = !r.segs.length;
+            const gaps = r.weekend ? [] : (empty ? [{ start: WORK_START, end: WORK_END }] : gapsFor(r.segs));
+            const gapsTxt = r.weekend ? "Fim de semana"
+                : (gaps.length ? `Sem registro: ${gaps.map(g => `${fmtHM(g.start)}-${fmtHM(g.end)}`).join(", ")}` : "Janela util toda registrada");
+            const segsHtml = r.segs.map(s => `
+                <div class="tlSeg" style="left:${pct(s.start)}%;width:${Math.max(0.6, pct(s.end) - pct(s.start))}%;background:${tlColor(s.key)}"
+                     title="${escapeHtml(`${s.key} · ${fmtHM(s.start)}-${fmtHM(s.end)} · ${s.formatted}\n${s.title}`)}"></div>`).join("");
+            const gapsHtml = gaps.map(g => `
+                <div class="tlGap" style="left:${pct(g.start)}%;width:${Math.max(0, pct(g.end) - pct(g.start))}%"></div>`).join("");
+            const nowHtml = (r.date === todayTz && nowMin >= winStart && nowMin <= winEnd)
+                ? `<div class="tlNow" style="left:${pct(nowMin)}%" title="Agora ${fmtHM(nowMin)}"></div>` : "";
+            const totalColor = r.weekend ? "var(--muted-foreground)"
+                : empty ? "var(--destructive)"
+                : (r.totalSeconds >= 8 * 3600 ? "var(--success)" : "var(--warning)");
+            return `
+            <div class="tlRow">
+                <div class="tlDay"><b>${weekdayLabel(r.date)}</b> ${r.date.slice(8, 10)}/${r.date.slice(5, 7)}</div>
+                <div class="tlTrack" title="${escapeHtml(gapsTxt)}">
+                    <div class="tlWork" style="left:${pct(WORK_START)}%;width:${Math.max(0, pct(WORK_END) - pct(WORK_START))}%"></div>
+                    ${gapsHtml}${segsHtml}${nowHtml}
+                    ${empty && !r.weekend ? '<span class="tlEmpty">sem registro</span>' : ""}
+                </div>
+                <div class="tlTotal mono" style="color:${totalColor}">${empty ? "00:00" : r.formatted}</div>
+            </div>`;
+        }).join("") + '</div>';
+    }
+
     function statusDotStyle(status){
         if (status==="done") return "background: var(--success)";
         if (status==="in_progress") return "background: var(--primary)";
@@ -1884,6 +2059,7 @@
             renderSprint(d);
             renderProjects(d);
             renderHeatmap(d);
+            renderDayTimeline(d);
             renderReviewed(d);
             renderDailyDetails(d);
             renderActivity(d);
